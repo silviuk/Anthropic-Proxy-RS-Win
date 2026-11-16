@@ -1,0 +1,46 @@
+name: Store MSIX
+on:
+  workflow_dispatch:
+    inputs:
+      backend_run:
+        description: Windows workflow run containing the tested portable backend
+        required: true
+        default: '43868285681'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: anthropic-proxy-windows-x64
+          run-id: ${{ inputs.backend_run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dist/tested-backend
+      - name: Prepare tested backend
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem dist/tested-backend -Filter '*.zip' | Select-Object -First 1
+          if (-not $archive) { throw 'Tested backend archive is missing.' }
+          Expand-Archive $archive.FullName dist/tested-backend/extracted
+          $backend = Get-ChildItem dist/tested-backend/extracted -Filter anthropic-proxy.exe -Recurse | Select-Object -First 1
+          if (-not $backend) { throw 'Tested backend executable is missing.' }
+          New-Item -ItemType Directory target/x86_64-pc-windows-msvc/release, dist/ui-test -Force | Out-Null
+          Copy-Item $backend.FullName target/x86_64-pc-windows-msvc/release/
+      - name: Build and validate MSIX
+        run: ./packaging/msix/build.ps1
+      - name: Test deployment and packaged startup API
+        shell: powershell
+        run: ./packaging/msix/test.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: store-msix-package
+          path: dist/*.msix
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-msix-test-evidence
+          path: dist/ui-test

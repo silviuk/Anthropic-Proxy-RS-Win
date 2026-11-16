@@ -19,7 +19,6 @@
     <Application Id="App" Executable="Anthropic-Proxy-RS-Win.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements DisplayName="Anthropic-Proxy-RS-Win" Description="Original proxy by Ivan Zakutnii (m0n0x41d). Windows app by Silviu Vlasceanu."
         Square150x150Logo="Assets\icon-150.png" Square44x44Logo="Assets\icon-44.png" BackgroundColor="transparent">
-        <uap:DefaultTile Square310x310Logo="Assets\icon-310.png" />
       </uap:VisualElements>
       <Extensions>
         <uap5:Extension Category="windows.startupTask" Executable="ProxyStartup.exe" EntryPoint="Windows.FullTrustApplication">
