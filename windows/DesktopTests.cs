@@ -247,6 +247,7 @@ namespace AnthropicProxyDesktop
                     window.ThemeOverride = null; window.ApplyTheme();
                     Require((window.BackColor.GetBrightness() < 0.5f) == MainWindow.SystemDark(), "System theme selection failed");
                     window.MaximumSize = new Size(1920, 1080);
+                    window.MinimumSize = new Size(1366, 768);
                     window.Size = new Size(1366, 768);
                     Require(window.Width >= 1366 && window.Height >= 768, "Store screenshots are below the required dimensions");
                     window.CapturePreview(Path.Combine(output, "store-settings-light.png"), false, false);
