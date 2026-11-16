@@ -56,7 +56,10 @@ pub fn start(cli: &Cli) -> Result<bool> {
         }
         fs::remove_file(&cli.pid_file)?;
     }
-    let log_path = std::env::temp_dir().join("anthropic-proxy.log");
+    let log_path = cli
+        .log_file
+        .clone()
+        .unwrap_or_else(|| std::env::temp_dir().join("anthropic-proxy.log"));
     let log = fs::OpenOptions::new()
         .create(true)
         .append(true)
