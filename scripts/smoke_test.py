@@ -144,8 +144,31 @@ def run():
             failure = subprocess.run(args + ['--daemon', '--pid-file', pid], cwd=directory, env=env, timeout=20)
             assert failure.returncode != 0
             assert not Path(pid).exists()
+        # Check capture independently of the desktop, including streamed responses.
+        for capture in (False, True):
+            log_path = Path(directory) / ('bodies-on.log' if capture else 'bodies-off.log')
+            config.write_text(f'UPSTREAM_BASE_URL=http://127.0.0.1:{upstream.server_port}\n'
+                              f'UPSTREAM_API_KEY_PASSTHROUGH=true\nANTHROPIC_PROXY_BIND=127.0.0.1\nPORT={port}\n')
+            log_env = dict(env, VERBOSE='true' if capture else 'false')
+            log_env.pop('RUST_LOG', None)
+            child = subprocess.Popen(args + ['--log-file', str(log_path)], env=log_env, cwd=directory)
+            try:
+                ready(base, child)
+                request = {'model': 'test-model', 'max_tokens': 64,
+                           'messages': [{'role': 'user', 'content': 'private-request-marker'}]}
+                fetch(base, '/v1/messages', request)
+                fetch(base, '/v1/messages', dict(request, stream=True))
+            finally:
+                child.terminate()
+                child.wait(timeout=10)
+            logs = log_path.read_text(encoding='utf-8')
+            for marker in ('private-request-marker', 'Received OpenAI response',
+                           'Transformed Anthropic stream', 'Received OpenAI stream'):
+                assert (marker in logs) == capture, (capture, marker, logs)
+            assert 'smoke-secret' not in logs
+            assert '\x1b[' not in logs, 'ANSI escapes in log file'
         upstream.shutdown()
-    print('PASS: CLI, health, models, messages, SSE, tools, model mapping, key passthrough, metrics, daemon lifecycle')
+    print('PASS: CLI, health, models, messages, SSE, tools, model mapping, key passthrough, metrics, daemon lifecycle, opt-in request/response and stream logging')
 
 
 if __name__ == '__main__':

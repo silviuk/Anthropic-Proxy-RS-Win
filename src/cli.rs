@@ -18,6 +18,14 @@ pub struct Cli {
     #[arg(short, long, value_name = "FILE")]
     pub config: Option<PathBuf>,
 
+    /// Use only environment variables and skip .env file discovery
+    #[arg(long)]
+    pub no_env_file: bool,
+
+    /// Write plain text logs to this file (rotates at 10 MiB, one backup)
+    #[arg(long, value_name = "FILE")]
+    pub log_file: Option<PathBuf>,
+
     /// Enable debug logging (same as DEBUG=true)
     #[arg(short, long)]
     pub debug: bool,

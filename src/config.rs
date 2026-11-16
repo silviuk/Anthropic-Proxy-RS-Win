@@ -89,10 +89,16 @@ impl Config {
     }
 
     pub fn from_env_with_path(custom_path: Option<PathBuf>) -> Result<Self> {
-        if let Some(path) = Self::load_dotenv(custom_path) {
-            eprintln!("📄 Loaded config from: {}", path.display());
-        } else {
-            eprintln!("ℹ️  No .env file found, using environment variables only");
+        Self::from_environment(custom_path, true)
+    }
+
+    pub fn from_environment(custom_path: Option<PathBuf>, load_file: bool) -> Result<Self> {
+        if load_file {
+            if let Some(path) = Self::load_dotenv(custom_path) {
+                eprintln!("📄 Loaded config from: {}", path.display());
+            } else {
+                eprintln!("ℹ️  No .env file found, using environment variables only");
+            }
         }
 
         let port = env::var("PORT")

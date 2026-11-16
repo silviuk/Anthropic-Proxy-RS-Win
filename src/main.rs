@@ -2,6 +2,7 @@ mod cli;
 mod config;
 mod daemon;
 mod error;
+mod logging;
 mod metrics;
 mod models;
 mod proxy;
@@ -51,7 +52,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn async_main(cli: Cli) -> anyhow::Result<()> {
-    let mut config = Config::from_env_with_path(cli.config)?;
+    let mut config = Config::from_environment(cli.config, !cli.no_env_file)?;
 
     if cli.debug {
         config.debug = true;
@@ -86,12 +87,21 @@ async fn async_main(cli: Cli) -> anyhow::Result<()> {
         tracing::Level::INFO
     };
 
+    let file_logging = cli.log_file.is_some();
+    let writer: Box<dyn std::io::Write + Send> = match cli.log_file {
+        Some(path) => Box::new(logging::RotatingLog::open(path)?),
+        None => Box::new(std::io::stdout()),
+    };
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| format!("anthropic_proxy={}", log_level).into()),
         )
-        .with(tracing_subscriber::fmt::layer())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_ansi(!file_logging)
+                .with_writer(std::sync::Mutex::new(writer)),
+        )
         .init();
 
     tracing::info!("Starting Anthropic Proxy v{}", env!("CARGO_PKG_VERSION"));

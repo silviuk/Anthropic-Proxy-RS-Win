@@ -13,7 +13,7 @@ High-performance Rust proxy that translates Anthropic API requests to OpenAI-com
 
 ## Windows
 
-For the native Windows x64 executable, PowerShell setup, background operation and build instructions, see [WINDOWS.md](WINDOWS.md). This fork adds Windows support to the upstream proxy.
+The [Windows package](https://github.com/silviuk/anthropic-proxy-rs/releases) includes a native settings app with system light/dark appearance, proxy Start/Stop, optional autostart at sign-in, and a live request/response log viewer. Open `anthropic-proxy-ui.exe` after extracting the package. See [WINDOWS.md](WINDOWS.md) for setup and build instructions.
 
 ## Quick Start
 

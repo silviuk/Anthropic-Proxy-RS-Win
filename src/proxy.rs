@@ -91,7 +91,10 @@ pub async fn list_models_handler(
                     .text()
                     .await
                     .unwrap_or_else(|_| "Unknown error".to_string());
-                tracing::warn!("Upstream {} returned {}: {}", url, status, error_text);
+                tracing::warn!("Upstream {} returned {}", url, status);
+                if config.verbose {
+                    tracing::trace!("Upstream error response: {}", error_text);
+                }
                 if is_retriable_status(status.as_u16()) {
                     last_err = Some(format!("Upstream returned {}: {}", status, error_text));
                     continue;
@@ -187,7 +190,10 @@ async fn handle_non_streaming(
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            tracing::warn!("Upstream {} returned {}: {}", url, status, error_text);
+            tracing::warn!("Upstream {} returned {}", url, status);
+            if config.verbose {
+                tracing::trace!("Upstream error response: {}", error_text);
+            }
             metrics::upstream_error("chat_completions");
 
             if is_retriable_status(status.as_u16()) {
@@ -281,7 +287,10 @@ async fn handle_streaming(
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            tracing::warn!("Upstream {} returned {}: {}", url, status, error_text);
+            tracing::warn!("Upstream {} returned {}", url, status);
+            if config.verbose {
+                tracing::trace!("Upstream error response: {}", error_text);
+            }
             metrics::upstream_error("chat_completions");
 
             if is_retriable_status(status.as_u16()) {
@@ -297,8 +306,25 @@ async fn handle_streaming(
             )));
         }
 
-        let upstream = response.bytes_stream();
-        let sse_stream = create_sse_stream(upstream, openai_req.model.clone());
+        let verbose = config.verbose;
+        let upstream = response.bytes_stream().inspect(move |chunk| {
+            if verbose {
+                if let Ok(bytes) = chunk {
+                    tracing::trace!("Received OpenAI stream: {}", String::from_utf8_lossy(bytes));
+                }
+            }
+        });
+        let sse_stream =
+            create_sse_stream(upstream, openai_req.model.clone()).inspect(move |chunk| {
+                if verbose {
+                    if let Ok(bytes) = chunk {
+                        tracing::trace!(
+                            "Transformed Anthropic stream: {}",
+                            String::from_utf8_lossy(bytes)
+                        );
+                    }
+                }
+            });
 
         let mut headers = HeaderMap::new();
         headers.insert(
