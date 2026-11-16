@@ -33,7 +33,7 @@ if ($MSIX) {
         '@echo off',
         "call `"$environment`" -no_logo -arch=x64",
         'if errorlevel 1 exit /b %errorlevel%',
-        "cl.exe /nologo /std:c++17 /EHsc /MT /O2 `"$source`" /Fe:`"$target`" /Fo:`"$object`" /link windowsapp.lib",
+        "cl.exe /nologo /std:c++20 /EHsc /MT /O2 `"$source`" /Fe:`"$target`" /Fo:`"$object`" /link windowsapp.lib",
         'exit /b %errorlevel%'
     ))
     try {
