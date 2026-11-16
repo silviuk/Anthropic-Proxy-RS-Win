@@ -73,6 +73,11 @@ jobs:
       - name: Verify installation and removal
         shell: pwsh
         run: ./packaging/test-installer.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-installer-test-evidence
+          path: dist/ui-test/installer-*
       - name: Installer checksum
         shell: pwsh
         run: |

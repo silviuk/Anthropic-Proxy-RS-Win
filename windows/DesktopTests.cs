@@ -8,12 +8,65 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Threading;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
 namespace AnthropicProxyDesktop
 {
     static class DesktopTests
     {
+        delegate bool WindowCallback(IntPtr handle, IntPtr data);
+        [DllImport("user32.dll")] static extern bool EnumWindows(WindowCallback callback, IntPtr data);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
+        [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
+        [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr window, out WindowRect rect);
+        [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr window, IntPtr dc, int flags);
+        [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
+        struct WindowRect { public int Left, Top, Right, Bottom; }
+        internal static void PreviewInstaller(string installer, string output)
+        {
+            using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")) {
+                object previous = key.GetValue("AppsUseLightTheme");
+                try {
+                    foreach (bool dark in new[] { false, true }) {
+                        key.SetValue("AppsUseLightTheme", dark ? 0 : 1, RegistryValueKind.DWord);
+                        IntPtr window = IntPtr.Zero;
+                        using (var launcher = Process.Start(new ProcessStartInfo(installer, "/SP- /NORESTART") { UseShellExecute = false })) {
+                            try {
+                                for (int i = 0; i < 150 && window == IntPtr.Zero; i++) {
+                                    EnumWindows(delegate(IntPtr candidate, IntPtr ignored) {
+                                        var title = new StringBuilder(500); GetWindowText(candidate, title, title.Capacity);
+                                        if (IsWindowVisible(candidate) && title.ToString().Contains("Anthropic-Proxy-RS-Win")) window = candidate;
+                                        return true;
+                                    }, IntPtr.Zero);
+                                    Thread.Sleep(100);
+                                }
+                                Require(window != IntPtr.Zero, "Installer window did not open");
+                                Thread.Sleep(500);
+                                WindowRect rect; Require(GetWindowRect(window, out rect), "Cannot read installer bounds");
+                                using (var image = new Bitmap(rect.Right - rect.Left, rect.Bottom - rect.Top)) {
+                                    using (var graphics = Graphics.FromImage(image)) {
+                                        IntPtr dc = graphics.GetHdc();
+                                        try { Require(PrintWindow(window, dc, 0), "Cannot render installer window"); }
+                                        finally { graphics.ReleaseHdc(dc); }
+                                    }
+                                    image.Save(Path.Combine(output, dark ? "installer-dark.png" : "installer-light.png"));
+                                }
+                            } finally {
+                                if (window != IntPtr.Zero) {
+                                    uint pid; GetWindowThreadProcessId(window, out pid);
+                                    try { using (var process = Process.GetProcessById((int)pid)) { process.Kill(); process.WaitForExit(5000); } } catch (ArgumentException) {}
+                                }
+                                if (!launcher.HasExited) { launcher.Kill(); launcher.WaitForExit(5000); }
+                            }
+                        }
+                    }
+                } finally {
+                    if (previous == null) key.DeleteValue("AppsUseLightTheme", false); else key.SetValue("AppsUseLightTheme", previous, RegistryValueKind.DWord);
+                }
+            }
+        }
         static void Require(bool condition, string message) { if (!condition) throw new Exception(message); }
         static void Reject(Action action, string message)
         {

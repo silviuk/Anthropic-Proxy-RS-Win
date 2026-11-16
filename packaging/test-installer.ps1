@@ -1,6 +1,10 @@
 $ErrorActionPreference = 'Stop'
 $version = (Select-String '^version = "([^"]+)"' Cargo.toml | Select-Object -First 1).Matches.Groups[1].Value
 $setup = (Resolve-Path "dist/Anthropic-Proxy-RS-Win-$version-Setup.exe").Path
+$output = (Resolve-Path dist/ui-test).Path
+$preview = Start-Process dist/package/Anthropic-Proxy-RS-Win.exe -ArgumentList @('--installer-preview', "`"$setup`"", "`"$output`"") -PassThru
+if (-not $preview.WaitForExit(60000)) { Stop-Process -Id $preview.Id -Force; throw 'Installer appearance test timed out.' }
+if ($preview.ExitCode -ne 0) { Get-Content dist/ui-test/desktop-test-error.txt -ErrorAction SilentlyContinue; throw 'Installer appearance test failed.' }
 $directory = Join-Path $env:RUNNER_TEMP 'Proxy installation test'
 $install = Start-Process $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$directory`"", "/LOG=`"$env:RUNNER_TEMP\proxy-install.log`"") -Wait -PassThru
 if ($install.ExitCode -ne 0) { throw "Silent install failed: $($install.ExitCode)" }

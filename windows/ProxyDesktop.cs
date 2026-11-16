@@ -70,9 +70,11 @@ namespace AnthropicProxyDesktop
                     throw new Exception("Use a service URL, versioned base URL or full /chat/completions endpoint.");
             }
             System.Net.IPAddress address;
-            if (!System.Net.IPAddress.TryParse((Bind ?? "").Trim('[', ']'), out address))
-                throw new Exception("Enter a listening address, such as 127.0.0.1, 0.0.0.0 or [::1].");
-            if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6) Bind = "[" + address + "]";
+            string host = (Bind ?? "").Trim().Trim('[', ']');
+            if (System.Net.IPAddress.TryParse(host, out address))
+                Bind = address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? "[" + address + "]" : address.ToString();
+            else if (Uri.CheckHostName(host) == UriHostNameType.Dns) Bind = host;
+            else throw new Exception("Enter a listening address, such as localhost, 127.0.0.1 or [::1].");
             if (Port < 1 || Port > 65535) throw new Exception("The listening port must be between 1 and 65535.");
             if (Passthrough && GetKey().Length != 0) throw new Exception("Clear the saved API key before enabling client API key passthrough.");
             foreach (string entry in ModelMap.Split(new[] { ';', '\n' }, StringSplitOptions.RemoveEmptyEntries))
@@ -506,7 +508,7 @@ namespace AnthropicProxyDesktop
         static void OpenLink(string url) { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
         internal void SetIndicator(State state, string text)
         {
-            indicator = state; status.Text = text;
+            indicator = state; status.Text = text.Length > 180 ? text.Substring(0, 177) + "..." : text;
             status.ForeColor = state == State.Warning ? (lastDark == true ? Color.Orange : Color.DarkOrange) :
                 state == State.Running ? (lastDark == true ? Color.LimeGreen : Color.ForestGreen) : (lastDark == true ? Color.Salmon : Color.Firebrick);
         }
@@ -699,7 +701,7 @@ namespace AnthropicProxyDesktop
             finally { polling = false; }
         }
         void TryAction(Action action) { try { action(); } catch (Exception error) { ShowError(error); } }
-        void ShowError(Exception error) { warningMessage = error.Message; SetIndicator(State.Warning, "Warning • " + error.Message); feedback.Text = error.Message; MessageBox.Show(this, error.Message, "Anthropic-Proxy-RS-Win", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        void ShowError(Exception error) { warningMessage = error.Message; SetIndicator(State.Warning, "Warning • " + error.Message); feedback.Text = error.Message.Length > 220 ? error.Message.Substring(0, 217) + "..." : error.Message; MessageBox.Show(this, error.Message, "Anthropic-Proxy-RS-Win", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         internal void RefreshLogs()
         {
             try
@@ -777,6 +779,7 @@ namespace AnthropicProxyDesktop
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             try
             {
+                if (args.Length > 0 && args[0] == "--installer-preview") { DesktopTests.PreviewInstaller(args[1], args[2]); return 0; }
                 if (args.Length > 0 && args[0] == "--self-test") { DesktopTests.Run(args.Skip(1).ToArray()); return 0; }
                 var controller = new Controller(DataDirectory, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "anthropic-proxy.exe"));
                 if (args.Contains("--uninstall")) { controller.Stop(); controller.SetAutostart(false); return 0; }
@@ -794,13 +797,13 @@ namespace AnthropicProxyDesktop
             }
             catch (Exception error)
             {
-                if (!args.Contains("--self-test"))
+                if (!args.Contains("--self-test") && !args.Contains("--installer-preview"))
                 {
                     Directory.CreateDirectory(DataDirectory);
                     File.WriteAllText(Path.Combine(DataDirectory, "startup-error.txt"), error.ToString());
                 }
-                if (!args.Contains("--autostart") && !args.Contains("--self-test")) MessageBox.Show(error.Message, "Anthropic-Proxy-RS-Win", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                if (args.Contains("--self-test")) File.WriteAllText(Path.Combine(args.Last(), "desktop-test-error.txt"), error.ToString());
+                if (!args.Contains("--autostart") && !args.Contains("--self-test") && !args.Contains("--installer-preview")) MessageBox.Show(error.Message, "Anthropic-Proxy-RS-Win", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if (args.Contains("--self-test") || args.Contains("--installer-preview")) File.WriteAllText(Path.Combine(args.Last(), "desktop-test-error.txt"), error.ToString());
                 return 1;
             }
         }
