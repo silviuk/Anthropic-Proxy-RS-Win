@@ -478,7 +478,7 @@ namespace AnthropicProxyDesktop
             logLayout.Controls.Add(logButtons, 0, 2); logTab.Controls.Add(logLayout);
             root.Controls.Add(tabs, 0, 3);
             feedback.AutoSize = true; feedback.MaximumSize = new Size(700, 0); feedback.Margin = new Padding(0, 10, 0, 6);
-            feedback.Text = "API keys are encrypted for your Windows account. Closing this window keeps the proxy running.";
+            feedback.Text = "API keys are encrypted for your Windows account. Apply settings to change the running proxy.";
             root.Controls.Add(feedback, 0, 4);
             var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, Margin = new Padding(0, 8, 0, 0) };
             apply.Text = "Save and apply"; start.Text = "Save and start"; stop.Text = "Stop proxy";
@@ -489,13 +489,17 @@ namespace AnthropicProxyDesktop
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2 };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             footer.Controls.Add(actions, 0, 0);
-            var about = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Anchor = AnchorStyles.Right | AnchorStyles.Bottom };
+            var about = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 3 };
+            about.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            for (int i = 0; i < 3; i++) about.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             about.Controls.Add(new Label { Text = "v" + typeof(Program).Assembly.GetName().Version.ToString(3) + " • Silviu Vlasceanu", AutoSize = true, Font = new Font("Segoe UI", 8.5f) });
             var github = new LinkLabel { Text = "GitHub: Anthropic-Proxy-RS-Win", AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
             github.LinkClicked += delegate { OpenLink("https://github.com/silviuk/Anthropic-Proxy-RS-Win"); };
             var fork = new LinkLabel { Text = "Fork of m0n0x41d/anthropic-proxy-rs", AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
             fork.LinkClicked += delegate { OpenLink("https://github.com/m0n0x41d/anthropic-proxy-rs"); };
-            about.Controls.Add(github); about.Controls.Add(fork); footer.Controls.Add(about, 1, 0);
+            about.Controls.Add(github); about.Controls.Add(fork);
+            foreach (Label label in about.Controls) { label.Dock = DockStyle.Fill; label.TextAlign = ContentAlignment.MiddleRight; }
+            footer.Controls.Add(about, 1, 0);
             root.Controls.Add(footer, 0, 5); Controls.Add(root);
             AcceptButton = apply;
             LoadSettings();
