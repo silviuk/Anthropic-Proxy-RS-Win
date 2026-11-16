@@ -24,6 +24,7 @@ OutputDir=..\dist
 OutputBaseFilename=Anthropic-Proxy-RS-Win-{#AppVersion}-Setup
 Compression=lzma2
 SolidCompression=yes
+UninstallDisplayName=Anthropic-Proxy-RS-Win
 UninstallDisplayIcon={app}\Anthropic-Proxy-RS-Win.exe
 LicenseFile=..\LICENSE
 CloseApplications=yes

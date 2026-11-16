@@ -18,7 +18,9 @@ jobs:
       - name: Prepare Microsoft's WinGet client
         shell: pwsh
         run: |
-          if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+          $repair = -not (Get-Command winget -ErrorAction SilentlyContinue)
+          if (-not $repair) { $repair = [version]((winget --version).Trim().TrimStart('v')) -lt [version]'1.28.0' }
+          if ($repair) {
             Install-Module -Name Microsoft.WinGet.Client -Force -Repository PSGallery
             Repair-WinGetPackageManager -Force -Latest
           }
