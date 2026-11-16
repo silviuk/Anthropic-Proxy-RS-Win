@@ -35,6 +35,11 @@ jobs:
         run: cargo build --release --locked --target x86_64-pc-windows-msvc
       - name: Test executable against a local upstream
         run: python scripts/smoke_test.py target/x86_64-pc-windows-msvc/release/anthropic-proxy.exe
+      - name: Set disposable test display for Store screenshots
+        shell: powershell
+        run: |
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          Get-DisplayResolution
       - name: Test settings, autostart, themes and log viewer
         shell: pwsh
         run: |
