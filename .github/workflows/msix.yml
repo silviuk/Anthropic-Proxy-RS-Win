@@ -32,6 +32,14 @@ jobs:
           Copy-Item $backend.FullName target/x86_64-pc-windows-msvc/release/
       - name: Build and validate MSIX
         run: ./packaging/msix/build.ps1
+      - name: Verify native UI and capture Store screenshots
+        shell: pwsh
+        run: |
+          $app = (Resolve-Path dist/msix/staging/Anthropic-Proxy-RS-Win.exe).Path
+          $backend = (Resolve-Path target/x86_64-pc-windows-msvc/release/anthropic-proxy.exe).Path
+          $output = (Resolve-Path dist/ui-test).Path
+          $process = Start-Process $app -ArgumentList @('--self-test', "`"$backend`"", "`"$output`"") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { Get-Content dist/ui-test/desktop-test-error.txt -ErrorAction SilentlyContinue; throw 'Native UI validation failed.' }
       - name: Test deployment and packaged startup API
         shell: powershell
         run: ./packaging/msix/test.ps1
