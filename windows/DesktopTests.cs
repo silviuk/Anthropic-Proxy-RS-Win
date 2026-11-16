@@ -17,6 +17,8 @@ namespace AnthropicProxyDesktop
         {
             string binary = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
             Directory.CreateDirectory(output);
+            Action<string> progress = delegate(string text) { File.AppendAllText(Path.Combine(output, "desktop-test-progress.txt"), text + "\r\n"); };
+            progress("Starting settings and encryption tests");
             string directory = Path.Combine(Path.GetTempPath(), "Anthropic Proxy UI test " + Guid.NewGuid().ToString("N"));
             string runKey = @"Software\AnthropicProxy\Tests\" + Guid.NewGuid().ToString("N");
             var controller = new Controller(directory, binary, runKey);
@@ -44,12 +46,14 @@ namespace AnthropicProxyDesktop
                 catch { rejected = true; }
                 Require(rejected, "Invalid URL was accepted");
 
+                progress("Starting autostart and process control tests");
                 controller.AutoStart(); Require(!controller.IsRunning(), "Disabled autostart started proxy");
                 controller.SetAutostart(true); controller.AutoStart(); controller.SetAutostart(false);
                 Require(controller.IsRunning(), "Enabled autostart did not start proxy");
                 controller.Start(settings); // Repeated start must leave the managed instance running.
                 string health = new WebClient().DownloadString("http://127.0.0.1:" + port + "/health");
                 Require(health == "OK", "Health failed");
+                progress("Starting request and log capture tests");
                 Task serve = Task.Run(delegate {
                     using (TcpClient connection = upstream.AcceptTcpClient())
                     using (NetworkStream stream = connection.GetStream())
@@ -78,6 +82,7 @@ namespace AnthropicProxyDesktop
                 string log = controller.ReadLog();
                 Require(log.Contains("desktop-request-marker") && log.Contains("desktop-response-marker"), "Request/response logging missing");
                 Require(!log.Contains("desktop-secret-key"), "API key leaked to logs");
+                progress("Starting native window and theme rendering tests");
                 using (var window = new MainWindow(controller))
                 {
                     window.Show(); Application.DoEvents();
@@ -92,6 +97,7 @@ namespace AnthropicProxyDesktop
                     Require((window.BackColor.GetBrightness() < 0.5f) == MainWindow.SystemDark(), "System theme selection failed");
                     window.Close(); Application.DoEvents();
                 }
+                progress("Starting stop and log clearing tests");
                 Require(controller.IsRunning(), "Closing settings stopped the proxy");
                 controller.Stop(); Require(!controller.IsRunning(), "UI controller could not stop proxy");
                 settings.CaptureBodies = false; controller.Save(settings); controller.ClearLogs();

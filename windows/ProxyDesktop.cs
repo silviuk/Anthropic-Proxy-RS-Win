@@ -166,8 +166,8 @@ namespace AnthropicProxyDesktop
             info.WorkingDirectory = DirectoryPath;
             info.UseShellExecute = false;
             info.CreateNoWindow = true;
-            info.RedirectStandardOutput = true;
-            info.RedirectStandardError = true;
+            // Do not create redirected pipes: a detached Windows child can inherit
+            // their handles and keep a reader waiting after the launcher exits.
             if (settings != null)
             {
                 string[] variables = { "UPSTREAM_BASE_URL", "ANTHROPIC_PROXY_BASE_URL", "UPSTREAM_API_KEY", "OPENROUTER_API_KEY",
@@ -187,12 +187,14 @@ namespace AnthropicProxyDesktop
             }
             using (Process process = Process.Start(info))
             {
-                Task<string> stdout = process.StandardOutput.ReadToEndAsync();
-                Task<string> stderr = process.StandardError.ReadToEndAsync();
                 if (!process.WaitForExit(20000)) { process.Kill(); throw new Exception("The proxy command timed out. Check Logs and the current status."); }
-                Task.WaitAll(stdout, stderr);
-                if (process.ExitCode != 0) throw new Exception((stderr.Result + "\n" + stdout.Result).Trim());
-                return stdout.Result + stderr.Result;
+                if (process.ExitCode != 0)
+                {
+                    string details = ReadLog();
+                    if (details.Length > 3000) details = details.Substring(details.Length - 3000);
+                    throw new Exception("Proxy command failed (exit code " + process.ExitCode + ").\r\n" + details);
+                }
+                return "";
             }
         }
         internal string ReadLog()
