@@ -2,6 +2,17 @@ use anyhow::{bail, Result};
 use reqwest::Url;
 use std::{collections::BTreeMap, env, path::PathBuf};
 
+fn home_directory() -> Option<std::ffi::OsString> {
+    #[cfg(windows)]
+    {
+        env::var_os("USERPROFILE").or_else(|| env::var_os("HOME"))
+    }
+    #[cfg(not(windows))]
+    {
+        env::var_os("HOME")
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub port: u16,
@@ -51,13 +62,19 @@ impl Config {
             return Some(path);
         }
 
-        if let Ok(home) = env::var("HOME") {
+        if let Some(home) = home_directory() {
             let home_config = PathBuf::from(home).join(".anthropic-proxy.env");
             if home_config.exists() && dotenvy::from_path(&home_config).is_ok() {
                 return Some(home_config);
             }
         }
 
+        #[cfg(windows)]
+        let etc_config =
+            PathBuf::from(env::var_os("PROGRAMDATA").unwrap_or_else(|| "C:\\ProgramData".into()))
+                .join("anthropic-proxy")
+                .join(".env");
+        #[cfg(not(windows))]
         let etc_config = PathBuf::from("/etc/anthropic-proxy/.env");
         if etc_config.exists() && dotenvy::from_path(&etc_config).is_ok() {
             return Some(etc_config);

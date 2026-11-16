@@ -42,8 +42,13 @@ pub struct Cli {
     #[arg(long)]
     pub daemon: bool,
 
+    /// Internal flag for the detached Windows process
+    #[cfg(windows)]
+    #[arg(long, hide = true)]
+    pub daemon_child: bool,
+
     /// PID file path (used with daemon commands)
-    #[arg(long, value_name = "FILE", default_value = "/tmp/anthropic-proxy.pid")]
+    #[arg(long, value_name = "FILE", default_value_os_t = crate::daemon::default_pid_file())]
     pub pid_file: PathBuf,
 }
 
@@ -52,13 +57,13 @@ pub enum Command {
     /// Stop running daemon
     Stop {
         /// PID file path
-        #[arg(long, value_name = "FILE", default_value = "/tmp/anthropic-proxy.pid")]
+        #[arg(long, value_name = "FILE", default_value_os_t = crate::daemon::default_pid_file())]
         pid_file: PathBuf,
     },
     /// Check daemon status
     Status {
         /// PID file path
-        #[arg(long, value_name = "FILE", default_value = "/tmp/anthropic-proxy.pid")]
+        #[arg(long, value_name = "FILE", default_value_os_t = crate::daemon::default_pid_file())]
         pid_file: PathBuf,
     },
 }

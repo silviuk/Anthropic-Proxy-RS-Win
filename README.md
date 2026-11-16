@@ -11,6 +11,10 @@ High-performance Rust proxy that translates Anthropic API requests to OpenAI-com
 - **Extended Thinking**: Supports Claude's reasoning mode
 - **Drop-in Replacement**: Compatible with official Anthropic SDKs
 
+## Windows
+
+For the native Windows x64 executable, PowerShell setup, background operation and build instructions, see [WINDOWS.md](WINDOWS.md). This fork adds Windows support to the upstream proxy.
+
 ## Quick Start
 
 > **Note**: Using [Task](https://taskfile.dev) is currently recommended. Install with `brew install go-task` (macOS) or see the [installation guide](https://taskfile.dev/installation/). Releases with build binaries will be made soon.
