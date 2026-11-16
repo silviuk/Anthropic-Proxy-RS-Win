@@ -83,11 +83,11 @@ namespace AnthropicProxyDesktop
                     window.Show(); Application.DoEvents();
                     Require(window.ReadSettings().GetKey() == "desktop-secret-key", "API key did not load into settings UI");
                     Require(window.ReadSettings().Port == port, "Port did not load into settings UI");
-                    window.Capture(Path.Combine(output, "settings-light.png"), false, false);
+                    window.CapturePreview(Path.Combine(output, "settings-light.png"), false, false);
                     Require(window.BackColor.GetBrightness() > 0.5f, "Light theme did not apply");
-                    window.Capture(Path.Combine(output, "settings-dark.png"), true, false);
+                    window.CapturePreview(Path.Combine(output, "settings-dark.png"), true, false);
                     Require(window.BackColor.GetBrightness() < 0.5f, "Dark theme did not apply");
-                    window.Capture(Path.Combine(output, "logs-dark.png"), true, true);
+                    window.CapturePreview(Path.Combine(output, "logs-dark.png"), true, true);
                     window.ThemeOverride = null; window.ApplyTheme();
                     Require((window.BackColor.GetBrightness() < 0.5f) == MainWindow.SystemDark(), "System theme selection failed");
                     window.Close(); Application.DoEvents();

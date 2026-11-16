@@ -364,14 +364,16 @@ namespace AnthropicProxyDesktop
                 feedback.Text = "Settings saved." + (enable ? " Autostart is enabled for your Windows sign-in." : " Autostart is disabled.");
             }
             catch (Exception error) { ShowError(error); }
-            finally { SetBusy(false); await RefreshStatusAsync(); RefreshLogs(); }
+            finally { SetBusy(false); }
+            await RefreshStatusAsync(); RefreshLogs();
         }
         async Task StopAsync()
         {
             if (busy) return; SetBusy(true);
             try { await Task.Run(delegate { controller.Stop(); }); feedback.Text = "Proxy stopped."; }
             catch (Exception error) { ShowError(error); }
-            finally { SetBusy(false); await RefreshStatusAsync(); }
+            finally { SetBusy(false); }
+            await RefreshStatusAsync();
         }
         void SetBusy(bool value) { busy = value; apply.Enabled = start.Enabled = stop.Enabled = !value; }
         async Task RefreshStatusAsync()
@@ -381,7 +383,7 @@ namespace AnthropicProxyDesktop
             try
             {
                 bool running = await Task.Run(delegate { return controller.IsRunning(); });
-                if (IsDisposed) return;
+                if (IsDisposed || busy) return;
                 status.Text = running ? "Running • Settings changes apply after saving." : "Stopped • Save and start when ready.";
                 stop.Enabled = running; start.Enabled = !running;
             }
@@ -454,7 +456,7 @@ namespace AnthropicProxyDesktop
             base.WndProc(ref message);
             if (message.Msg == 0x001A || message.Msg == 0x031A) { lastDark = null; if (IsHandleCreated) ApplyTheme(); }
         }
-        internal void Capture(string file, bool dark, bool logTab)
+        internal void CapturePreview(string file, bool dark, bool logTab)
         {
             ThemeOverride = dark; tabs.SelectedIndex = logTab ? 1 : 0; ApplyTheme(); RefreshLogs();
             Show(); Application.DoEvents();

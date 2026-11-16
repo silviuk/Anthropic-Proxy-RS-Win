@@ -72,6 +72,8 @@ anthropic-proxy --help
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--config <FILE>` | `-c` | Path to custom .env file |
+| `--no-env-file` | | Use environment variables without discovering `.env` files |
+| `--log-file <FILE>` | | Write plain text logs with rotation at approximately 10 MiB and one backup |
 | `--debug` | `-d` | Enable debug logging |
 | `--verbose` | `-v` | Enable verbose logging (logs full request/response bodies) |
 | `--port <PORT>` | `-p` | Port to listen on (overrides PORT env var) |
