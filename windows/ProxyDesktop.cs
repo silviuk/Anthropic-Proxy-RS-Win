@@ -220,6 +220,51 @@ namespace AnthropicProxyDesktop
         }
     }
 
+    // Native buttons and panels avoid the legacy TabControl's fixed light strip.
+    sealed class PageSwitcher : TableLayoutPanel
+    {
+        readonly FlowLayoutPanel navigation = new FlowLayoutPanel();
+        readonly Panel container = new Panel();
+        readonly List<Control> pages = new List<Control>();
+        readonly List<Button> buttons = new List<Button>();
+        int selected = -1;
+        internal event EventHandler SelectedIndexChanged;
+        internal PageSwitcher()
+        {
+            ColumnCount = 1; RowCount = 2; Dock = DockStyle.Fill;
+            ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            RowStyles.Add(new RowStyle(SizeType.AutoSize)); RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            navigation.Dock = DockStyle.Fill; navigation.AutoSize = true; navigation.WrapContents = false;
+            navigation.Margin = new Padding(0, 0, 0, 8);
+            container.Dock = DockStyle.Fill; container.Margin = new Padding(0);
+            Controls.Add(navigation, 0, 0); Controls.Add(container, 0, 1);
+        }
+        internal void AddPage(string title, Control page)
+        {
+            int index = pages.Count;
+            var button = new Button { Text = title, Width = 110, Height = 34, Margin = new Padding(0, 0, 6, 0), AccessibleName = title + " page" };
+            button.Click += delegate { SelectedIndex = index; };
+            page.Dock = DockStyle.Fill; page.Visible = false;
+            pages.Add(page); buttons.Add(button); navigation.Controls.Add(button); container.Controls.Add(page);
+            if (selected < 0) SelectedIndex = 0;
+        }
+        internal int SelectedIndex
+        {
+            get { return selected; }
+            set
+            {
+                if (value == selected) return;
+                selected = value;
+                for (int i = 0; i < pages.Count; i++)
+                {
+                    pages[i].Visible = i == selected;
+                    buttons[i].FlatAppearance.BorderSize = i == selected ? 2 : 1;
+                }
+                if (SelectedIndexChanged != null) SelectedIndexChanged(this, EventArgs.Empty);
+            }
+        }
+    }
+
     sealed class MainWindow : Form
     {
         readonly Controller controller;
@@ -230,7 +275,7 @@ namespace AnthropicProxyDesktop
         readonly Button apply = new Button(), start = new Button(), stop = new Button();
         readonly Label status = new Label(), feedback = new Label();
         readonly RichTextBox logs = new RichTextBox();
-        readonly TabControl tabs = new TabControl();
+        readonly PageSwitcher tabs = new PageSwitcher();
         readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
         bool busy, polling;
         bool? lastDark;
@@ -262,11 +307,9 @@ namespace AnthropicProxyDesktop
             status.AutoSize = true; status.Margin = new Padding(0, 0, 0, 16); status.Text = "Checking proxy status...";
             root.Controls.Add(status, 0, 1);
             tabs.Dock = DockStyle.Fill;
-            tabs.DrawMode = TabDrawMode.OwnerDrawFixed; tabs.ItemSize = new Size(110, 32); tabs.SizeMode = TabSizeMode.Fixed;
-            tabs.DrawItem += DrawTab;
-            var settingsTab = new TabPage("Settings") { Padding = new Padding(14), AutoScroll = true };
-            var logTab = new TabPage("Logs") { Padding = new Padding(10) };
-            tabs.TabPages.Add(settingsTab); tabs.TabPages.Add(logTab);
+            var settingsTab = new Panel { Padding = new Padding(10), AutoScroll = true, AccessibleName = "Settings" };
+            var logTab = new Panel { Padding = new Padding(10), AccessibleName = "Logs" };
+            tabs.AddPage("Settings", settingsTab); tabs.AddPage("Logs", logTab);
             var fields = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
             fields.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
             fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -447,15 +490,6 @@ namespace AnthropicProxyDesktop
             if (control.IsHandleCreated && (control is TextBoxBase || control is NumericUpDown))
                 SetWindowTheme(control.Handle, dark ? "DarkMode_Explorer" : "Explorer", null);
             foreach (Control child in control.Controls) ThemeControl(child, back, fore, input, dark, contrast);
-        }
-        void DrawTab(object sender, DrawItemEventArgs args)
-        {
-            bool selected = args.Index == tabs.SelectedIndex;
-            Color background = lastDark == true ? Color.FromArgb(selected ? 43 : 30, selected ? 43 : 30, selected ? 43 : 30) : SystemColors.Control;
-            if (SystemInformation.HighContrast) background = selected ? SystemColors.Highlight : SystemColors.Window;
-            Color foreground = SystemInformation.HighContrast && selected ? SystemColors.HighlightText : ForeColor;
-            using (var brush = new SolidBrush(background)) args.Graphics.FillRectangle(brush, args.Bounds);
-            TextRenderer.DrawText(args.Graphics, tabs.TabPages[args.Index].Text, Font, args.Bounds, foreground, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
         protected override void WndProc(ref Message message)
         {
