@@ -14,6 +14,10 @@ using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
+[assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8", FrameworkDisplayName = ".NET Framework 4.8")]
+[assembly: System.Reflection.AssemblyTitle("Anthropic Proxy")]
+[assembly: System.Reflection.AssemblyVersion("1.3.0.0")]
+
 namespace AnthropicProxyDesktop
 {
     sealed class Settings
