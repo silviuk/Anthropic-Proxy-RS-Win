@@ -19,7 +19,7 @@ try {
     $package = Get-AppxPackage -Name $identity.Name
     if (-not $package -or $package.PackageFamilyName -ne $identity.PackageFamilyName) { throw 'Installed package identity mismatch.' }
     if ($package.Version -ne "$version.0") { throw 'Installed MSIX version mismatch.' }
-    foreach ($file in @('Anthropic-Proxy-RS-Win.exe','ProxyStartup.exe','anthropic-proxy.exe','Assets/icon-150.png')) {
+    foreach ($file in @('Anthropic-Proxy-RS-Win.exe','ProxyStartup.exe','StartupControl.exe','anthropic-proxy.exe','Assets/icon-150.png')) {
         if (-not (Test-Path (Join-Path $package.InstallLocation $file))) { throw "MSIX is missing $file" }
     }
     # Launch with actual package identity and verify packaged startup API access.

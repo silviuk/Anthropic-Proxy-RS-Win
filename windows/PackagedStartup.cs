@@ -1,8 +1,9 @@
 using System;
 #if MSIX_BUILD
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-using Windows.ApplicationModel;
 #endif
 
 namespace AnthropicProxyDesktop
@@ -13,20 +14,25 @@ namespace AnthropicProxyDesktop
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
         static extern int GetCurrentPackageFullName(ref int length, StringBuilder name);
         internal static bool IsPackaged { get { int size = 0; return GetCurrentPackageFullName(ref size, null) == 122; } }
-        static StartupTask Task()
+        static int Command(string command)
         {
-            return System.WindowsRuntimeSystemExtensions.AsTask(StartupTask.GetAsync("AnthropicProxyStartup")).GetAwaiter().GetResult();
+            string executable = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StartupControl.exe");
+            var info = new ProcessStartInfo(executable, command) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            using (var process = Process.Start(info)) {
+                var output = process.StandardOutput.ReadToEndAsync(); var error = process.StandardError.ReadToEndAsync();
+                if (!process.WaitForExit(10000)) { process.Kill(); throw new Exception("Windows startup control timed out."); }
+                int state;
+                if (process.ExitCode != 0 || !Int32.TryParse(output.GetAwaiter().GetResult().Trim(), out state))
+                    throw new Exception("Windows startup control failed: " + error.GetAwaiter().GetResult());
+                return state;
+            }
         }
-        internal static bool Enabled { get { var state = Task().State; return state == StartupTaskState.Enabled || state == StartupTaskState.EnabledByPolicy; } }
+        internal static bool Enabled { get { int state = Command("state"); return state == 2 || state == 4; } }
         internal static void SetEnabled(bool enabled)
         {
-            var task = Task();
-            if (!enabled) { task.Disable(); return; }
-            var state = System.WindowsRuntimeSystemExtensions.AsTask(task.RequestEnableAsync()).GetAwaiter().GetResult();
-            if (state != StartupTaskState.Enabled && state != StartupTaskState.EnabledByPolicy)
-                throw new Exception(state == StartupTaskState.DisabledByUser ?
-                    "Enable Anthropic-Proxy-RS-Win in Windows Settings > Apps > Startup, then save again." :
-                    "Windows policy does not allow this startup task to be enabled.");
+            int state = Command(enabled ? "enable" : "disable");
+            if (enabled && state != 2 && state != 4)
+                throw new Exception(state == 1 ? "Enable Anthropic-Proxy-RS-Win in Windows Settings > Apps > Startup, then save again." : "Windows policy does not allow this startup task to be enabled.");
         }
 #else
         internal static bool IsPackaged { get { return false; } }

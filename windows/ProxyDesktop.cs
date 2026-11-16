@@ -16,7 +16,7 @@ using Microsoft.Win32;
 
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8", FrameworkDisplayName = ".NET Framework 4.8")]
 [assembly: System.Reflection.AssemblyTitle("Anthropic-Proxy-RS-Win")]
-[assembly: System.Reflection.AssemblyVersion("1.5.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.5.2.0")]
 
 namespace AnthropicProxyDesktop
 {
@@ -531,7 +531,7 @@ namespace AnthropicProxyDesktop
             Shown += async delegate { ApplyTheme(); timer.Start(); if (startHidden) { Hide(); ShowInTaskbar = false; } await RefreshStatusAsync(); };
             Resize += delegate { if (WindowState == FormWindowState.Minimized) { Hide(); ShowInTaskbar = false; } };
             FormClosing += delegate(object sender, FormClosingEventArgs args) {
-                if (!automation && !exitRequested && args.CloseReason == CloseReason.UserClosing && background.Checked) {
+                if (!automation && !exitRequested && args.CloseReason == CloseReason.UserClosing && !controller.HasForeground) {
                     args.Cancel = true; Hide(); ShowInTaskbar = false;
                 }
             };
