@@ -91,6 +91,16 @@ namespace AnthropicProxyDesktop
             if (String.Equals(library.Selected, profile.Name, StringComparison.OrdinalIgnoreCase)) library.Selected = newName;
             profile.Name = newName; Write(library); return newName;
         }
+        internal static void Export(string file, Settings settings, bool includeKey)
+        {
+            settings.Validate();
+            var serializer = new JavaScriptSerializer();
+            var fields = serializer.Deserialize<Dictionary<string, object>>(serializer.Serialize(settings));
+            fields.Remove("Secret");
+            if (includeKey) fields["ApiKey"] = settings.GetKey();
+            // Runtime paths are local to the selected machine; values are retained for review on import.
+            File.WriteAllText(file, serializer.Serialize(fields), new UTF8Encoding(false));
+        }
         internal string Import(string file)
         {
             // Import data only. Never evaluate shell commands or change autostart.
@@ -110,6 +120,7 @@ namespace AnthropicProxyDesktop
                 catch (System.Security.Cryptography.CryptographicException) { throw new Exception("This file's API key belongs to another Windows account. Import a .env file or remove the encrypted Secret field and enter the key again."); }
             }
             else settings = FromEnvironment(text);
+            if (!String.IsNullOrEmpty(settings.ConfigFile) && !File.Exists(settings.ConfigFile)) settings.ConfigFile = "";
             settings.Validate();
             string name = Path.GetFileNameWithoutExtension(file).Trim('.').Trim();
             if (String.IsNullOrWhiteSpace(name)) name = "Imported";
@@ -140,7 +151,7 @@ namespace AnthropicProxyDesktop
             var settings = new Settings { Upstream = upstream, Bind = get("ANTHROPIC_PROXY_BIND", "127.0.0.1"), Port = port,
                 Completion = get("COMPLETION_MODEL", ""), Reasoning = get("REASONING_MODEL", ""),
                 ModelMap = get("ANTHROPIC_PROXY_MODEL_MAP", ""), IgnoreTerms = get("ANTHROPIC_PROXY_SYSTEM_PROMPT_IGNORE_TERMS", ""),
-                Passthrough = BooleanValue(get("UPSTREAM_API_KEY_PASSTHROUGH", "false")), CaptureBodies = BooleanValue(get("VERBOSE", "false")) };
+                Passthrough = BooleanValue(get("UPSTREAM_API_KEY_PASSTHROUGH", "false")), Debug = BooleanValue(get("DEBUG", "false")), CaptureBodies = BooleanValue(get("VERBOSE", "false")) };
             settings.SetKey(get("UPSTREAM_API_KEY", get("OPENROUTER_API_KEY", ""))); return settings;
         }
         static bool BooleanValue(string value)

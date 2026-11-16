@@ -4,7 +4,7 @@ This package includes a native Windows Forms settings app and the 64-bit Rust pr
 
 ## Use the Windows app
 
-Extract the ZIP to a permanent folder and open `anthropic-proxy-ui.exe`. Keep all packaged files together, including `anthropic-proxy-ui.exe.config`. The app follows the Windows app light/dark setting, including changes while it is open, and respects Windows high contrast colors.
+Extract the ZIP to a permanent folder and open `Anthropic-Proxy-RS-Win.exe`. Keep all packaged files together, including `Anthropic-Proxy-RS-Win.exe.config`. The app follows the Windows app light/dark setting, including changes while it is open, and respects Windows high contrast colors.
 
 Enter the upstream URL, API key and any model overrides. Choose **Save and start**. Use **Stop proxy** to stop it, or **Save and apply** to save settings and restart a running proxy. Closing the settings window leaves the proxy running. The CLI remains available separately; the app manages its own per-user proxy instance.
 
@@ -95,6 +95,6 @@ The `Windows` GitHub Actions workflow also checks formatting, runs Clippy, exerc
 
 ## Build the settings app
 
-From the repository root in PowerShell, use `./windows/build.ps1`. It uses the Windows .NET Framework compiler and writes `dist/package/anthropic-proxy-ui.exe` and its configuration file. Place the release proxy executable beside them.
+From the repository root in PowerShell, use `./windows/build.ps1`. It uses the Windows .NET Framework compiler and writes `dist/package/Anthropic-Proxy-RS-Win.exe` and its configuration file. Place the release proxy executable beside them.
 
 The Windows workflow tests settings persistence, DPAPI encryption, input validation, autostart registration in an isolated test registry key, proxy control, log capture and clearing, and native light/dark rendering. Screenshots and test results are retained as the `windows-ui-test-evidence` artifact. Autostart is tested through its registration and launcher behavior; CI does not reboot a desktop or sign a user in.

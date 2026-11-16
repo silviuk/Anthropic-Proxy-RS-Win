@@ -1,4 +1,4 @@
-# anthropic-proxy-rs
+# Anthropic-Proxy-RS-Win
 
 High-performance Rust proxy that translates Anthropic API requests to OpenAI-compatible format. Use Claude Code, Claude Desktop, or any Anthropic API client with OpenRouter, native OpenAI, or any OpenAI-compatible endpoint.
 
@@ -13,7 +13,7 @@ High-performance Rust proxy that translates Anthropic API requests to OpenAI-com
 
 ## Windows
 
-The [Windows package](https://github.com/silviuk/anthropic-proxy-rs/releases) includes a native settings app with system light/dark appearance, proxy Start/Stop, optional autostart at sign-in, and a live request/response log viewer. Open `anthropic-proxy-ui.exe` after extracting the package. See [WINDOWS.md](WINDOWS.md) for setup and build instructions.
+The [Windows package](https://github.com/silviuk/Anthropic-Proxy-RS-Win/releases) includes a native settings app with system light/dark appearance, proxy Start/Stop, optional autostart at sign-in, and a live request/response log viewer. Open `Anthropic-Proxy-RS-Win.exe` after extracting the package. See [WINDOWS.md](WINDOWS.md) for setup and build instructions.
 
 ## Quick Start
 
