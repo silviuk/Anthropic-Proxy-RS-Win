@@ -27,18 +27,43 @@ jobs:
           winget --info
           winget settings --enable LocalManifestFiles
           if ($LASTEXITCODE -ne 0) { throw 'Cannot enable local package testing on this runner.' }
-      - name: Validate and install the published package
+      - name: Validate the manifest
+        timeout-minutes: 2
         shell: pwsh
         run: |
           winget validate --manifest dist/winget/1.5.0 --disable-interactivity
           if ($LASTEXITCODE -ne 0) { throw 'WinGet manifest validation failed.' }
-          winget install --manifest dist/winget/1.5.0 --silent --scope user --accept-package-agreements --accept-source-agreements --disable-interactivity
+      - name: Install the published package
+        timeout-minutes: 4
+        shell: pwsh
+        run: |
+          # This disposable runner tests the community package, not the Store catalog.
+          winget source remove --name msstore --disable-interactivity
+          winget install --manifest dist/winget/1.5.0 --silent --scope user --accept-package-agreements --accept-source-agreements --disable-interactivity --verbose-logs
           if ($LASTEXITCODE -ne 0) { throw 'WinGet package installation failed.' }
           $app = Join-Path $env:LOCALAPPDATA 'Programs/Anthropic-Proxy-RS-Win/anthropic-proxy.exe'
           & $app --version
           if ($LASTEXITCODE -ne 0) { throw 'Installed executable verification failed.' }
-          winget uninstall --id SilviuVlasceanu.AnthropicProxyRSWin --exact --silent --disable-interactivity
+      - name: Remove the installed package
+        timeout-minutes: 3
+        shell: pwsh
+        run: |
+          winget uninstall --name Anthropic-Proxy-RS-Win --exact --silent --accept-source-agreements --disable-interactivity --verbose-logs
           if ($LASTEXITCODE -ne 0) { throw 'WinGet uninstall failed.' }
+      - name: Collect diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist/diagnostics -Force | Out-Null
+          $paths = @("$env:LOCALAPPDATA/Microsoft/WinGet/DiagOutputDir", "$env:LOCALAPPDATA/Packages/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe/LocalState/DiagOutputDir")
+          foreach ($path in $paths) {
+            if (Test-Path $path) { Get-ChildItem $path -Filter '*.log' | Copy-Item -Destination dist/diagnostics -Force }
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: winget-diagnostics
+          path: dist/diagnostics/*
       - uses: actions/upload-artifact@v4
         if: always()
         with:
