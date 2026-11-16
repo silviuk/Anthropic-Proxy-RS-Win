@@ -152,7 +152,7 @@ namespace AnthropicProxyDesktop
                 settings.Port = port; controller.Save(settings); // Exercise atomic replacement.
                 Require(!controller.Autostart, "Autostart should default to disabled");
                 controller.SetAutostart(true); Require(controller.Autostart, "Autostart did not enable");
-                using (var key = Registry.CurrentUser.OpenSubKey(runKey))
+                if (!PackagedStartup.IsPackaged) using (var key = Registry.CurrentUser.OpenSubKey(runKey))
                     Require((string)key.GetValue(Controller.RunValue) == Controller.Quote(Application.ExecutablePath) + " --autostart", "Startup command is not quoted correctly");
                 controller.SetAutostart(false); Require(!controller.Autostart, "Autostart did not disable");
                 Require(Controller.Quote(@"C:\folder with spaces\") == "\"C:\\folder with spaces\\\\\"", "Trailing backslash quoting failed");
@@ -202,9 +202,10 @@ namespace AnthropicProxyDesktop
                 Require(log.Contains("desktop-request-marker") && log.Contains("desktop-response-marker"), "Request/response logging missing");
                 Require(!log.Contains("desktop-secret-key"), "API key leaked to logs");
                 progress("Starting native window and theme rendering tests");
-                using (var window = new MainWindow(controller))
+                using (var window = new MainWindow(controller, true))
                 {
                     window.Show(); Application.DoEvents();
+                    Require(window.TrayVisible, "System tray icon is missing");
                     Require(window.ReadSettings().GetKey() == "desktop-secret-key", "API key did not load into settings UI");
                     Require(window.ReadSettings().Port == port, "Port did not load into settings UI");
                     Require(window.ProfileDropdown.Items.Contains("Default"), "Default profile is missing from dropdown");
@@ -245,6 +246,10 @@ namespace AnthropicProxyDesktop
                     controller.Start(settings); controller.ClearLogs();
                     window.ThemeOverride = null; window.ApplyTheme();
                     Require((window.BackColor.GetBrightness() < 0.5f) == MainWindow.SystemDark(), "System theme selection failed");
+                    window.Size = new Size(1366, 768);
+                    window.CapturePreview(Path.Combine(output, "store-settings-light.png"), false, false);
+                    window.CapturePreview(Path.Combine(output, "store-settings-dark.png"), true, false);
+                    window.CapturePreview(Path.Combine(output, "store-logs-dark.png"), true, true);
                     window.Close(); Application.DoEvents();
                 }
                 progress("Starting stop and log clearing tests");

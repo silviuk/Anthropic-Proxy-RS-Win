@@ -30,14 +30,14 @@ Publisher: Silviu Vlasceanu
 PublisherUrl: https://github.com/silviuk
 PublisherSupportUrl: {repo}/issues
 PrivacyUrl: {repo}/blob/main/PRIVACY.md
-Author: Silviu Vlasceanu
+Author: Ivan Zakutnii (m0n0x41d) and Silviu Vlasceanu
 PackageName: Anthropic-Proxy-RS-Win
 PackageUrl: {repo}
 License: MIT
 LicenseUrl: {repo}/blob/main/LICENSE
 Copyright: Copyright (c) 2026 Silviu Vlasceanu; upstream copyright (c) 2025 Ivan Zakutnii
 ShortDescription: Native Windows settings app for an Anthropic-to-OpenAI API proxy.
-Description: Native Windows app with named settings profiles, key-safe configuration export, debug and verbose logs, and proxy control. Fork of m0n0x41d/anthropic-proxy-rs.
+Description: Native Windows app with named settings profiles, key-safe configuration export, debug and verbose logs, and proxy control. Original proxy by Ivan Zakutnii (m0n0x41d), author of anthropic-proxy-rs. Windows UI and packaging by Silviu Vlasceanu.
 Moniker: anthropic-proxy-rs-win
 Tags:
 - anthropic

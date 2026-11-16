@@ -31,6 +31,7 @@ CloseApplications=yes
 RestartApplications=no
 CloseApplicationsFilter=Anthropic-Proxy-RS-Win.exe,anthropic-proxy.exe
 SetupLogging=yes
+SetupIconFile=..\assets\icon.ico
 [Files]
 Source: "{#PackageDir}\Anthropic-Proxy-RS-Win.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PackageDir}\Anthropic-Proxy-RS-Win.exe.config"; DestDir: "{app}"; Flags: ignoreversion

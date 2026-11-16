@@ -14,7 +14,7 @@ Prepared listing:
 - Publisher: use the verified Partner Center publisher
 - Category: Developer tools / Utilities
 - Short description: A native Windows app for configuring an Anthropic-to-OpenAI API proxy.
-- Description: Configure upstream endpoints, API keys, model routing and prompt terms. Save named settings, import or export configurations, and start or stop a local Anthropic-compatible proxy. The settings app follows the Windows light/dark appearance. Optional debug and verbose logs help inspect requests and responses. API keys are encrypted locally and omitted from exports unless explicitly included. This app is a fork of m0n0x41d/anthropic-proxy-rs and is not affiliated with Anthropic or OpenAI.
+- Description: Configure upstream endpoints, API keys, model routing and prompt terms. Save named settings, import or export configurations, and start or stop a local Anthropic-compatible proxy. The settings app follows the Windows light/dark appearance. Optional debug and verbose logs help inspect requests and responses. API keys are encrypted locally and omitted from exports unless explicitly included. The original proxy is by Ivan Zakutnii (m0n0x41d), author of anthropic-proxy-rs. The Windows UI, artwork and packaging are by Silviu Vlasceanu. This app is not affiliated with Anthropic or OpenAI.
 - Privacy URL: https://github.com/silviuk/Anthropic-Proxy-RS-Win/blob/main/PRIVACY.md
 - Support URL: https://github.com/silviuk/Anthropic-Proxy-RS-Win/issues
 - Upstream requirements: an OpenAI-compatible API endpoint; a provider account/API key may be required and provider charges may apply.
@@ -23,3 +23,5 @@ Prepared listing:
 Screenshots are produced by the native Windows desktop tests. Use the final version's `settings-light.png`, `settings-dark.png`, `logs-dark.png` and `export-warning.png`, without changing what the application actually displayed.
 
 References: https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msi/app-package-requirements and https://learn.microsoft.com/en-us/windows/apps/publish/get-started
+
+The selected Store route is MSIX. `packaging/msix/identity.json` records the actual reserved Partner Center identity for Store product `9PKT00FWGM35`. `packaging/msix/build.ps1` creates the unsigned upload, and `test.ps1` uses an ephemeral CI-only certificate to verify deployment and packaged runtime. That certificate and its private key are never part of the Store upload.

@@ -16,7 +16,7 @@ using Microsoft.Win32;
 
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8", FrameworkDisplayName = ".NET Framework 4.8")]
 [assembly: System.Reflection.AssemblyTitle("Anthropic-Proxy-RS-Win")]
-[assembly: System.Reflection.AssemblyVersion("1.5.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.5.1.0")]
 
 namespace AnthropicProxyDesktop
 {
@@ -127,6 +127,7 @@ namespace AnthropicProxyDesktop
         {
             get
             {
+                if (PackagedStartup.IsPackaged) return PackagedStartup.Enabled;
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RunKey))
                     return key != null && String.Equals(key.GetValue(RunValue) as string, StartupCommand, StringComparison.OrdinalIgnoreCase);
             }
@@ -134,6 +135,7 @@ namespace AnthropicProxyDesktop
         internal string StartupCommand { get { return Quote(Application.ExecutablePath) + " --autostart"; } }
         internal void SetAutostart(bool enabled)
         {
+            if (PackagedStartup.IsPackaged) { PackagedStartup.SetEnabled(enabled); return; }
             using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RunKey))
             {
                 if (enabled) key.SetValue(RunValue, StartupCommand, RegistryValueKind.String);
@@ -346,7 +348,17 @@ namespace AnthropicProxyDesktop
         readonly RichTextBox logs = new RichTextBox();
         readonly PageSwitcher tabs = new PageSwitcher();
         readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
-        bool busy, polling;
+        bool busy, polling, exitRequested;
+        readonly NotifyIcon tray = new NotifyIcon();
+        readonly ContextMenuStrip trayMenu = new ContextMenuStrip();
+        readonly ToolStripMenuItem trayState = new ToolStripMenuItem("Stopped");
+        readonly ToolStripMenuItem trayStart = new ToolStripMenuItem("Start proxy with these settings");
+        readonly ToolStripMenuItem trayStop = new ToolStripMenuItem("Stop proxy");
+        internal static readonly int ShowMessage = RegisterWindowMessage("Anthropic-Proxy-RS-Win.ShowSettings");
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int RegisterWindowMessage(string message);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern IntPtr FindWindow(string className, string title);
+        [DllImport("user32.dll")] internal static extern bool PostMessage(IntPtr window, int message, IntPtr wparam, IntPtr lparam);
+        internal bool TrayVisible { get { return tray.Visible && tray.Icon != null; } }
         bool? lastDark;
         bool lastHighContrast;
         string lastLog = "";
@@ -355,10 +367,20 @@ namespace AnthropicProxyDesktop
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)] static extern int SetWindowTheme(IntPtr window, string app, string id);
 
-        internal MainWindow(Controller control)
+        internal MainWindow(Controller control, bool automation = false, bool startHidden = false)
         {
             controller = control;
             Text = "Anthropic-Proxy-RS-Win";
+            Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            tray.Icon = Icon; tray.Text = "Anthropic-Proxy-RS-Win — Stopped"; tray.ContextMenuStrip = trayMenu;
+            var openSettings = new ToolStripMenuItem("Show settings"); openSettings.Click += delegate { ShowSettingsWindow(); };
+            var viewLogs = new ToolStripMenuItem("View logs"); viewLogs.Click += delegate { tabs.SelectedIndex = 1; RefreshLogs(); ShowSettingsWindow(); };
+            var exit = new ToolStripMenuItem("Exit and stop proxy");
+            trayStart.Click += async delegate { await ApplyAsync(true); };
+            trayStop.Click += async delegate { await StopAsync(); };
+            exit.Click += async delegate { await StopAsync(); if (!controller.IsRunning()) { exitRequested = true; Close(); } };
+            trayMenu.Items.AddRange(new ToolStripItem[] { trayState, new ToolStripSeparator(), openSettings, viewLogs, trayStart, trayStop, new ToolStripSeparator(), exit });
+            tray.DoubleClick += delegate { ShowSettingsWindow(); }; tray.Visible = true;
             Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi;
             AutoScaleDimensions = new SizeF(96, 96);
@@ -495,7 +517,7 @@ namespace AnthropicProxyDesktop
             about.Controls.Add(new Label { Text = "v" + typeof(Program).Assembly.GetName().Version.ToString(3) + " • Silviu Vlasceanu", AutoSize = true, Font = new Font("Segoe UI", 8.5f) });
             var github = new LinkLabel { Text = "GitHub: Anthropic-Proxy-RS-Win", AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
             github.LinkClicked += delegate { OpenLink("https://github.com/silviuk/Anthropic-Proxy-RS-Win"); };
-            var fork = new LinkLabel { Text = "Fork of m0n0x41d/anthropic-proxy-rs", AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
+            var fork = new LinkLabel { Text = "Original proxy: Ivan Zakutnii (m0n0x41d)", AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
             fork.LinkClicked += delegate { OpenLink("https://github.com/m0n0x41d/anthropic-proxy-rs"); };
             about.Controls.Add(github); about.Controls.Add(fork);
             foreach (Label label in about.Controls) { label.Dock = DockStyle.Fill; label.TextAlign = ContentAlignment.MiddleRight; }
@@ -506,15 +528,25 @@ namespace AnthropicProxyDesktop
             timer.Interval = 1000;
             timer.Tick += async delegate { ApplyTheme(); if (tabs.SelectedIndex == 1) RefreshLogs(); await RefreshStatusAsync(); };
             tabs.SelectedIndexChanged += delegate { RefreshLogs(); };
-            Shown += async delegate { ApplyTheme(); timer.Start(); await RefreshStatusAsync(); };
-            FormClosed += delegate { timer.Stop(); timer.Dispose(); if (controller.HasForeground) controller.Stop(); };
+            Shown += async delegate { ApplyTheme(); timer.Start(); if (startHidden) { Hide(); ShowInTaskbar = false; } await RefreshStatusAsync(); };
+            Resize += delegate { if (WindowState == FormWindowState.Minimized) { Hide(); ShowInTaskbar = false; } };
+            FormClosing += delegate(object sender, FormClosingEventArgs args) {
+                if (!automation && !exitRequested && args.CloseReason == CloseReason.UserClosing && background.Checked) {
+                    args.Cancel = true; Hide(); ShowInTaskbar = false;
+                }
+            };
+            FormClosed += delegate { timer.Stop(); timer.Dispose(); tray.Visible = false; tray.Dispose(); trayMenu.Dispose(); if (controller.HasForeground) controller.Stop(); };
         }
+        void ShowSettingsWindow() { ShowInTaskbar = true; Show(); WindowState = FormWindowState.Normal; Activate(); }
         static void OpenLink(string url) { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
         internal void SetIndicator(State state, string text)
         {
             indicator = state; status.Text = text.Length > 180 ? text.Substring(0, 177) + "..." : text;
+            tray.Text = "Anthropic-Proxy-RS-Win — " + state.ToString();
+            trayState.Text = state.ToString();
             status.ForeColor = state == State.Warning ? (lastDark == true ? Color.Orange : Color.DarkOrange) :
                 state == State.Running ? (lastDark == true ? Color.LimeGreen : Color.ForestGreen) : (lastDark == true ? Color.Salmon : Color.Firebrick);
+            trayState.ForeColor = status.ForeColor;
         }
         internal Color StatusColor { get { return status.ForeColor; } }
         internal void ApplyDialogTheme(Form dialog)
@@ -699,7 +731,7 @@ namespace AnthropicProxyDesktop
                 SetIndicator(warning ? State.Warning : running ? State.Running : State.Stopped,
                     warning ? (running ? "Running with warning • " : "Warning • ") + (warningMessage.Length > 0 ? warningMessage : "Open Logs for details.") :
                     running ? "Running • Settings changes apply after saving." : "Stopped • Save and start when ready.");
-                stop.Enabled = running; start.Enabled = !running;
+                stop.Enabled = running; start.Enabled = !running; trayStop.Enabled = running; trayStart.Enabled = !running;
             }
             catch (Exception error) { if (!IsDisposed) SetIndicator(State.Warning, "Status unavailable: " + error.Message); }
             finally { polling = false; }
@@ -732,6 +764,9 @@ namespace AnthropicProxyDesktop
             Color input = contrast ? SystemColors.Window : dark ? Color.FromArgb(43, 43, 43) : Color.White;
             ThemeControl(this, back, fore, input, dark, contrast);
             SetIndicator(indicator, status.Text);
+            trayMenu.BackColor = input; trayMenu.ForeColor = fore;
+            foreach (ToolStripItem item in trayMenu.Items) { item.BackColor = input; item.ForeColor = fore; }
+            trayState.ForeColor = status.ForeColor;
             if (IsHandleCreated)
             {
                 int value = dark ? 1 : 0;
@@ -763,6 +798,7 @@ namespace AnthropicProxyDesktop
         }
         protected override void WndProc(ref Message message)
         {
+            if (message.Msg == ShowMessage) { ShowSettingsWindow(); return; }
             base.WndProc(ref message);
             if (message.Msg == 0x001A || message.Msg == 0x031A) { lastDark = null; if (IsHandleCreated) ApplyTheme(); }
         }
@@ -783,31 +819,45 @@ namespace AnthropicProxyDesktop
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             try
             {
+                if (args.Length > 0 && args[0] == "--package-self-test") {
+                    if (!PackagedStartup.IsPackaged) throw new Exception("The Store runtime test has no package identity.");
+                    bool enabled = PackagedStartup.Enabled;
+                    using (var window = new MainWindow(control: new Controller(Path.Combine(args[1], "package-runtime"), Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "anthropic-proxy.exe")), automation: true)) {
+                        window.Show(); Application.DoEvents();
+                        if (!window.TrayVisible) throw new Exception("Packaged tray icon did not initialize.");
+                        window.Close();
+                    }
+                    File.WriteAllText(Path.Combine(args[1], "msix-runtime-result.txt"), "PASS: package identity, packaged startup state " + enabled + ", native window and tray initialization.");
+                    return 0;
+                }
                 if (args.Length > 0 && args[0] == "--installer-preview") { DesktopTests.PreviewInstaller(args[1], args[2]); return 0; }
                 if (args.Length > 0 && args[0] == "--self-test") { DesktopTests.Run(args.Skip(1).ToArray()); return 0; }
                 var controller = new Controller(DataDirectory, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "anthropic-proxy.exe"));
                 if (args.Contains("--uninstall")) { controller.Stop(); controller.SetAutostart(false); return 0; }
                 if (args.Contains("--autostart"))
                 {
-                    controller.AutoStart(); return 0;
+                    controller.AutoStart(); if (!controller.Autostart) return 0;
                 }
                 bool created;
                 using (var mutex = new Mutex(true, @"Local\AnthropicProxySettings", out created))
                 {
-                    if (!created) { MessageBox.Show("The settings window is already open.", "Anthropic-Proxy-RS-Win"); return 0; }
-                    Application.Run(new MainWindow(controller));
+                    if (!created) {
+                        if (!args.Contains("--autostart")) { var window = MainWindow.FindWindow(null, "Anthropic-Proxy-RS-Win"); if (window != IntPtr.Zero) MainWindow.PostMessage(window, MainWindow.ShowMessage, IntPtr.Zero, IntPtr.Zero); }
+                        return 0;
+                    }
+                    Application.Run(new MainWindow(controller, false, args.Contains("--autostart")));
                 }
                 return 0;
             }
             catch (Exception error)
             {
-                if (!args.Contains("--self-test") && !args.Contains("--installer-preview"))
+                if (!args.Contains("--self-test") && !args.Contains("--installer-preview") && !args.Contains("--package-self-test"))
                 {
                     Directory.CreateDirectory(DataDirectory);
                     File.WriteAllText(Path.Combine(DataDirectory, "startup-error.txt"), error.ToString());
                 }
-                if (!args.Contains("--autostart") && !args.Contains("--self-test") && !args.Contains("--installer-preview")) MessageBox.Show(error.Message, "Anthropic-Proxy-RS-Win", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                if (args.Contains("--self-test") || args.Contains("--installer-preview")) File.WriteAllText(Path.Combine(args.Last(), "desktop-test-error.txt"), error.ToString());
+                if (!args.Contains("--autostart") && !args.Contains("--self-test") && !args.Contains("--installer-preview") && !args.Contains("--package-self-test")) MessageBox.Show(error.Message, "Anthropic-Proxy-RS-Win", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if (args.Contains("--self-test") || args.Contains("--installer-preview") || args.Contains("--package-self-test")) File.WriteAllText(Path.Combine(args.Last(), "desktop-test-error.txt"), error.ToString());
                 return 1;
             }
         }

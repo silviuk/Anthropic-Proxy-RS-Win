@@ -1,5 +1,9 @@
 # Anthropic-Proxy-RS-Win
 
+<img src="assets/icon.svg" width="96" height="96" alt="Anthropic-Proxy-RS-Win icon">
+
+**Original proxy by [Ivan Zakutnii (m0n0x41d)](https://github.com/m0n0x41d), author of [anthropic-proxy-rs](https://github.com/m0n0x41d/anthropic-proxy-rs).** This fork adds a native Windows UI, system tray, profiles and packaging, maintained by Silviu Vlasceanu. The original MIT copyright and license are preserved.
+
 High-performance Rust proxy that translates Anthropic API requests to OpenAI-compatible format. Use Claude Code, Claude Desktop, or any Anthropic API client with OpenRouter, native OpenAI, or any OpenAI-compatible endpoint.
 
 ## Features

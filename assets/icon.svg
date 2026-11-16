@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Anthropic-Proxy-RS-Win</title>
+  <desc id="desc">Two luminous opposing brackets around a central relay, representing API translation and two-way traffic.</desc>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#17283e"/><stop offset="1" stop-color="#090f20"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".27" cy=".15" r=".95">
+      <stop stop-color="#39d9ed" stop-opacity=".16"/><stop offset="1" stop-color="#39d9ed" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cyan" x1=".15" y1="0" x2=".85" y2="1">
+      <stop stop-color="#83f7e4"/><stop offset="1" stop-color="#28c6ed"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#b5a2ff"/><stop offset="1" stop-color="#7175f6"/>
+    </linearGradient>
+    <linearGradient id="bridge" gradientUnits="userSpaceOnUse" x1="424" y1="512" x2="600" y2="512"><stop stop-color="#67e8f9"/><stop offset=".5" stop-color="#edf7ff"/><stop offset="1" stop-color="#a5a2ff"/></linearGradient>
+  </defs>
+  <rect x="24" y="24" width="976" height="976" rx="224" fill="url(#tile)"/>
+  <rect x="24" y="24" width="976" height="976" rx="224" fill="url(#glow)"/>
+  <rect x="27" y="27" width="970" height="970" rx="221" fill="none" stroke="#d5eaff" stroke-opacity=".1" stroke-width="6"/>
+  <path d="M425 300 254 512l171 212" fill="none" stroke="url(#cyan)" stroke-width="86" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m599 300 171 212-171 212" fill="none" stroke="url(#violet)" stroke-width="86" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M424 512h176" fill="none" stroke="url(#bridge)" stroke-width="70" stroke-linecap="round"/>
+</svg>

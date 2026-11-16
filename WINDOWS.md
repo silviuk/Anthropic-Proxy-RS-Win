@@ -135,3 +135,12 @@ The `Windows` GitHub Actions workflow also checks formatting, runs Clippy, exerc
 From the repository root in PowerShell, use `./windows/build.ps1`. It uses the Windows .NET Framework compiler and writes `dist/package/Anthropic-Proxy-RS-Win.exe` and its configuration file. Place the release proxy executable beside them.
 
 The Windows workflow tests settings persistence, DPAPI encryption, input validation, autostart registration in an isolated test registry key, proxy control, log capture and clearing, and native light/dark rendering. Screenshots and test results are retained as the `windows-ui-test-evidence` artifact. Autostart is tested through its registration and launcher behavior; CI does not reboot a desktop or sign a user in.
+
+
+## System tray and attribution
+
+The SVG in `assets/icon.svg` is the source of the Windows, system tray and Store icons. Double-click the tray icon to reopen settings. Its menu can show settings or logs, start or stop the proxy, or exit and stop it. In background mode, closing the window hides it to the tray; foreground mode stops the proxy when its controlling window closes. Autostart opens the controller in the tray.
+
+The original proxy is by **Ivan Zakutnii (m0n0x41d)**, author of [anthropic-proxy-rs](https://github.com/m0n0x41d/anthropic-proxy-rs). The Windows UI, SVG artwork and packaging are maintained by **Silviu Vlasceanu**. Both copyrights are retained in the MIT license.
+
+The Store MSIX uses Windows packaged startup tasks instead of a desktop Run registry entry. Startup is disabled by default, and Windows user or organization restrictions are respected. The unsigned Store upload is kept separate from the temporary test-signed package used only inside the disposable build runner.
