@@ -28,8 +28,18 @@ if ($MSIX) {
     $source = Join-Path $PSScriptRoot 'StartupControl.cpp'
     $target = Join-Path $OutputDirectory 'StartupControl.exe'
     $object = Join-Path $OutputDirectory 'StartupControl.obj'
-    $command = "`"$environment`" -no_logo -arch=x64 && cl.exe /nologo /std:c++17 /EHsc /MT /O2 `"$source`" /Fe:`"$target`" /Fo:`"$object`" /link windowsapp.lib"
-    & $env:ComSpec /d /s /c "`"$command`""
-    if ($LASTEXITCODE -ne 0) { throw 'Packaged startup control compilation failed.' }
-    Remove-Item $object -ErrorAction SilentlyContinue
+    $buildScript = Join-Path $OutputDirectory 'build-startup.cmd'
+    [IO.File]::WriteAllLines($buildScript, @(
+        '@echo off',
+        "call `"$environment`" -no_logo -arch=x64",
+        'if errorlevel 1 exit /b %errorlevel%',
+        "cl.exe /nologo /std:c++17 /EHsc /MT /O2 `"$source`" /Fe:`"$target`" /Fo:`"$object`" /link windowsapp.lib",
+        'exit /b %errorlevel%'
+    ))
+    try {
+        & $env:ComSpec /d /c $buildScript
+        if ($LASTEXITCODE -ne 0) { throw 'Packaged startup control compilation failed.' }
+    } finally {
+        Remove-Item $object, $buildScript -ErrorAction SilentlyContinue
+    }
 }
