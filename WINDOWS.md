@@ -12,6 +12,21 @@ The listen address defaults to `127.0.0.1` for local access. Use `0.0.0.0` only 
 
 Settings are saved under `%LOCALAPPDATA%\AnthropicProxy`. The API key is encrypted with Windows DPAPI for the current Windows account; it is decrypted only when needed and passed to the child proxy through its environment, never a command-line argument. The desktop uses its own settings rather than discovering `.env` files. The advanced fields accept model mappings as `source=target;other=target` and ignored prompt terms separated by semicolons.
 
+### Save and import named settings
+
+Use the **Saved settings** dropdown above the form:
+
+- Type a new name and choose **Save** to create a profile. Saving an existing name updates that profile. Names are case insensitive.
+- Select a saved name and choose **Load** to fill the form. The app asks before replacing unsaved form edits.
+- Select a saved name and choose **Rename** to give it a new name. This preserves its settings and encrypted API key.
+- Choose **Import...** to import a `.env` configuration or an existing desktop `settings.json`. The imported settings appear as a new named profile. Existing names are preserved; repeated imports receive a numeric suffix.
+
+Loading, importing, renaming or saving a profile does not restart the proxy. **Save and apply** or **Save and start** saves the current profile and applies it. Autostart continues to use the last applied settings, even when another profile has been loaded for editing. The autostart checkbox is a shared Windows setting, independent of profiles.
+
+Profiles are saved in `%LOCALAPPDATA%\AnthropicProxy\profiles.json`. On first use, the app preserves the existing desktop configuration as **Default**. The last loaded or saved profile is selected when the window opens. API keys remain encrypted for the current Windows account. An encrypted JSON key from another account or computer may not decrypt; use a `.env` file or re-enter that key instead.
+
+Environment imports accept `NAME=value`, optional `export`, comments, single-quoted literals and double-quoted values with `\n`, `\r`, `\t`, `\\` and `\"` escapes. Each setting must occupy one line; shell commands and variable substitutions are never executed. Supported fields include the upstream URL and key, passthrough authentication, bind address, port, completion/reasoning models, model mapping, ignored terms and `VERBOSE` for body capture. Unknown fields are ignored. Review imported settings before applying them.
+
 ### Autostart
 
 Check **Start proxy when I sign in to Windows**, then **Save and apply**. Uncheck and save to disable it. This controls the current user's `AnthropicProxy` entry in the Windows `Run` registry key; administrator rights are not required. It starts the proxy quietly after sign-in, without opening the settings window. It does not run before sign-in as a Windows service. Windows may delay startup, and Windows Startup settings can separately disable an entry.
