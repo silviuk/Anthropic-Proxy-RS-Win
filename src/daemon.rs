@@ -1,3 +1,4 @@
+#[cfg(unix)]
 use crate::cli::Cli;
 
 pub fn default_pid_file() -> std::path::PathBuf {
