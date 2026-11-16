@@ -489,7 +489,7 @@ namespace AnthropicProxyDesktop
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2 };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             footer.Controls.Add(actions, 0, 0);
-            var about = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 3 };
+            var about = new TableLayoutPanel { Size = new Size(300, 60), Anchor = AnchorStyles.Right | AnchorStyles.Bottom, ColumnCount = 1, RowCount = 3 };
             about.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             for (int i = 0; i < 3; i++) about.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             about.Controls.Add(new Label { Text = "v" + typeof(Program).Assembly.GetName().Version.ToString(3) + " • Silviu Vlasceanu", AutoSize = true, Font = new Font("Segoe UI", 8.5f) });
