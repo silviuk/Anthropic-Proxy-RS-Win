@@ -6,7 +6,9 @@ This package includes a native Windows Forms settings app and the 64-bit Rust pr
 
 Extract the ZIP to a permanent folder and open `Anthropic-Proxy-RS-Win.exe`. Keep all packaged files together, including `Anthropic-Proxy-RS-Win.exe.config`. The app follows the Windows app light/dark setting, including changes while it is open, and respects Windows high contrast colors.
 
-Enter the upstream URL, API key and any model overrides. Choose **Save and start**. Use **Stop proxy** to stop it, or **Save and apply** to save settings and restart a running proxy. Background mode leaves the proxy running when the window closes. With background mode disabled, closing its controlling window stops that proxy. The CLI remains available separately; the app manages its own per-user proxy instance.
+Enter the upstream URL, API key and any model overrides. Choose **Save and start** to save and start the form's settings. **Start proxy** starts the last applied settings while preserving the current form for editing; the tray's start command does the same. **Save and apply** saves settings and restarts a running proxy; a stopped proxy stays stopped. Use **Stop proxy** to stop it. Background mode leaves the proxy running when the window closes. With background mode disabled, closing its controlling window stops that proxy. The CLI remains available separately; the app manages its own per-user proxy instance.
+
+Command failures show a short summary and scrollable diagnostic details. Startup failures use new output from that attempt, and management commands show their own error output. Earlier upstream HTTP errors remain in Logs. For an upstream 401 or 403, check the provider's required HTTPS endpoint, API key and model access; such a response does not by itself explain a local startup failure.
 
 The listen address defaults to `127.0.0.1` for local access. Use `0.0.0.0` only when you intend to accept connections from other machines. The proxy does not add client authorization checks.
 

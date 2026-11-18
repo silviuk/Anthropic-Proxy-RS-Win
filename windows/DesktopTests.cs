@@ -244,6 +244,15 @@ namespace AnthropicProxyDesktop
                     Require(window.TrayVisible, "System tray icon is missing");
                     Require(window.ReadSettings().GetKey() == "desktop-secret-key", "API key did not load into settings UI");
                     Require(window.ReadSettings().Port == port, "Port did not load into settings UI");
+                    controller.Stop(); Pump(window.ApplyAsync(false));
+                    Require(!controller.IsRunning(), "Save and apply unexpectedly started a stopped proxy");
+                    string appliedSettings = File.ReadAllText(controller.SettingsPath);
+                    window.ProfileDropdown.Text = "Unsaved startup draft";
+                    Pump(window.StartSavedAsync());
+                    Require(controller.IsRunning(), "Standalone Start proxy did not start saved settings");
+                    Require(File.ReadAllText(controller.SettingsPath) == appliedSettings, "Standalone Start proxy changed the saved settings");
+                    Require(window.ProfileDropdown.Text == "Unsaved startup draft", "Standalone Start proxy replaced the form draft");
+                    window.ProfileDropdown.Text = "Default";
                     Require(window.ProfileDropdown.Items.Contains("Default"), "Default profile is missing from dropdown");
                     window.ProfileDropdown.Text = "Work laptop"; window.SaveProfile();
                     Require(window.ProfileDropdown.Items.Contains("Work laptop"), "Saving a profile did not update dropdown");
