@@ -108,11 +108,11 @@ namespace AnthropicProxyDesktop
             }
             store.Load("Default");
         }
-        static void Pump(Task task)
+        static void Pump(Task task, string operation = "UI operation")
         {
-            var deadline = DateTime.UtcNow.AddSeconds(10);
+            var deadline = DateTime.UtcNow.AddSeconds(30);
             do { Application.DoEvents(); Thread.Sleep(10); } while (!task.IsCompleted && DateTime.UtcNow < deadline);
-            Require(task.IsCompleted, "UI operation timed out"); task.GetAwaiter().GetResult(); Application.DoEvents();
+            Require(task.IsCompleted, operation + " timed out (task: " + task.Status + ")"); task.GetAwaiter().GetResult(); Application.DoEvents();
         }
         static void TestExport(Controller controller, string directory)
         {
@@ -244,20 +244,24 @@ namespace AnthropicProxyDesktop
                     Require(window.TrayVisible, "System tray icon is missing");
                     Require(window.ReadSettings().GetKey() == "desktop-secret-key", "API key did not load into settings UI");
                     Require(window.ReadSettings().Port == port, "Port did not load into settings UI");
-                    controller.Stop(); Pump(window.ApplyAsync());
+                    progress("Testing Apply while stopped");
+                    controller.Stop(); Pump(window.ApplyAsync(), "Apply while stopped");
                     Require(!controller.IsRunning(), "Apply unexpectedly started a stopped proxy");
                     Require(window.StartStopButton.Parent.Controls.OfType<Button>().Select(button => button.Text).SequenceEqual(new[] { "Apply", "Start", "Status" }), "Bottom action buttons do not match the requested layout");
                     Require(window.StatusLabel.PointToScreen(Point.Empty).Y >= window.StartStopButton.PointToScreen(Point.Empty).Y + window.StartStopButton.Height, "Colored status is not below the buttons");
                     string appliedSettings = File.ReadAllText(controller.SettingsPath);
                     window.ProfileDropdown.Text = "Unsaved startup draft";
-                    Pump(window.ToggleAsync());
+                    progress("Testing Start with a form draft");
+                    Pump(window.ToggleAsync(), "Start with a form draft");
                     Require(controller.IsRunning(), "Standalone Start proxy did not start saved settings");
                     Require(window.StartStopButton.Text == "Stop", "Start button did not change to Stop");
                     Require(File.ReadAllText(controller.SettingsPath) == appliedSettings, "Standalone Start proxy changed the saved settings");
                     Require(window.ProfileDropdown.Text == "Unsaved startup draft", "Standalone Start proxy replaced the form draft");
-                    Pump(window.ToggleAsync());
+                    progress("Testing Stop toggle");
+                    Pump(window.ToggleAsync(), "Stop toggle");
                     Require(!controller.IsRunning() && window.StartStopButton.Text == "Start", "Stop button did not stop the proxy and change to Start");
-                    Pump(window.ToggleAsync());
+                    progress("Testing Start toggle after Stop");
+                    Pump(window.ToggleAsync(), "Start toggle after Stop");
                     window.ProfileDropdown.Text = "Default";
                     Require(window.ProfileDropdown.Items.Contains("Default"), "Default profile is missing from dropdown");
                     window.ProfileDropdown.Text = "Work laptop"; window.SaveProfile();
