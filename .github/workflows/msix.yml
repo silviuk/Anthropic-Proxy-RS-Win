@@ -43,7 +43,12 @@ jobs:
           $app = (Resolve-Path dist/msix/staging/Anthropic-Proxy-RS-Win.exe).Path
           $backend = (Resolve-Path target/x86_64-pc-windows-msvc/release/anthropic-proxy.exe).Path
           $output = (Resolve-Path dist/ui-test).Path
-          $process = Start-Process $app -ArgumentList @('--self-test', "`"$backend`"", "`"$output`"") -Wait -PassThru
+          $process = Start-Process $app -ArgumentList @('--self-test', "`"$backend`"", "`"$output`"") -PassThru
+          if (-not $process.WaitForExit(120000)) {
+            Stop-Process -Id $process.Id -Force
+            Get-Content dist/ui-test/desktop-test-progress.txt -ErrorAction SilentlyContinue
+            throw 'Native UI validation timed out.'
+          }
           if ($process.ExitCode -ne 0) { Get-Content dist/ui-test/desktop-test-error.txt -ErrorAction SilentlyContinue; throw 'Native UI validation failed.' }
       - name: Test deployment and packaged startup API
         shell: powershell

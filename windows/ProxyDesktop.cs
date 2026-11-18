@@ -370,6 +370,7 @@ namespace AnthropicProxyDesktop
         readonly PageSwitcher tabs = new PageSwitcher();
         readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
         bool busy, polling, exitRequested;
+        readonly bool automation;
         readonly NotifyIcon tray = new NotifyIcon();
         readonly ContextMenuStrip trayMenu = new ContextMenuStrip();
         readonly ToolStripMenuItem trayState = new ToolStripMenuItem("Stopped");
@@ -391,6 +392,7 @@ namespace AnthropicProxyDesktop
         internal MainWindow(Controller control, bool automation = false, bool startHidden = false)
         {
             controller = control;
+            this.automation = automation;
             Text = "Anthropic-Proxy-RS-Win";
             Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             tray.Icon = Icon; tray.Text = "Anthropic-Proxy-RS-Win — Stopped"; tray.ContextMenuStrip = trayMenu;
@@ -782,6 +784,7 @@ namespace AnthropicProxyDesktop
         void TryAction(Action action) { try { action(); } catch (Exception error) { ShowError(error); } }
         void ShowError(Exception error)
         {
+            if (automation) throw new Exception("Native UI action failed: " + error.Message, error);
             warningMessage = ErrorDialog.Summary(error);
             SetIndicator(State.Warning, "Warning • " + warningMessage); feedback.Text = warningMessage;
             using (var dialog = new ErrorDialog(error)) {
