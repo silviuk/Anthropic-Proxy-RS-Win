@@ -17,11 +17,18 @@ High-performance Rust proxy that translates Anthropic API requests to OpenAI-com
 
 ## Windows
 
-The [Windows package](https://github.com/silviuk/Anthropic-Proxy-RS-Win/releases) includes a native settings app with system light/dark appearance, proxy Start/Stop, optional autostart at sign-in, and a live request/response log viewer. Open `Anthropic-Proxy-RS-Win.exe` after extracting the package. See [WINDOWS.md](WINDOWS.md) for setup and build instructions.
+The [Windows package](https://github.com/silviuk/Anthropic-Proxy-RS-Win/releases/latest) includes a native settings app with system light/dark appearance, saved setting profiles, proxy Start/Stop, optional autostart at sign-in, and a live request/response log viewer. Use the Setup EXE to install it, or extract the portable ZIP and open `Anthropic-Proxy-RS-Win.exe`. See [WINDOWS.md](WINDOWS.md) for setup and build instructions.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/windows-settings-dark.png">
+  <img src="assets/screenshots/windows-settings-light.png" alt="Anthropic-Proxy-RS-Win 1.5.4 with saved setting profiles, Apply, Stop and Status buttons, and green running status below the buttons." width="816">
+</picture>
+
+The screenshots show version 1.5.4 running on Windows with a local test endpoint and a masked test key. **Apply** saves the form and updates a running proxy. **Start/Stop** uses the last applied settings, and **Status** refreshes the process status.
 
 ## Quick Start
 
-> **Note**: Using [Task](https://taskfile.dev) is currently recommended. Install with `brew install go-task` (macOS) or see the [installation guide](https://taskfile.dev/installation/). Releases with build binaries will be made soon.
+For Windows, download the installation package or portable ZIP from [GitHub Releases](https://github.com/silviuk/Anthropic-Proxy-RS-Win/releases/latest). The instructions below are for building from source. [Task](https://taskfile.dev) can run the build commands; install it with `brew install go-task` on macOS or follow the [installation guide](https://taskfile.dev/installation/).
 
 
 ```bash
