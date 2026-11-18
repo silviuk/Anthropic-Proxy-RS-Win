@@ -16,7 +16,7 @@ using Microsoft.Win32;
 
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8", FrameworkDisplayName = ".NET Framework 4.8")]
 [assembly: System.Reflection.AssemblyTitle("Anthropic-Proxy-RS-Win")]
-[assembly: System.Reflection.AssemblyVersion("1.5.2.0")]
+[assembly: System.Reflection.AssemblyVersion("1.5.3.0")]
 
 namespace AnthropicProxyDesktop
 {
@@ -159,9 +159,14 @@ namespace AnthropicProxyDesktop
         }
         internal bool IsRunning()
         {
-            if (!File.Exists(PidPath)) return false;
             int pid;
-            if (!Int32.TryParse(File.ReadAllText(PidPath).Trim(), out pid) || pid <= 0) return false;
+            try {
+                using (var file = new FileStream(PidPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (var reader = new StreamReader(file))
+                    if (!Int32.TryParse(reader.ReadToEnd().Trim(), out pid) || pid <= 0) return false;
+            }
+            catch (FileNotFoundException) { return false; }
+            catch (DirectoryNotFoundException) { return false; }
             try
             {
                 using (Process process = Process.GetProcessById(pid))
@@ -189,7 +194,13 @@ namespace AnthropicProxyDesktop
         }
         internal void Stop()
         {
-            if (IsRunning()) Execute("stop --pid-file " + Quote(PidPath), null);
+            if (!IsRunning()) return;
+            try { Execute("stop --pid-file " + Quote(PidPath), null); }
+            catch (ProxyCommandException) {
+                // Another stop or process exit may finish between the initial
+                // status check and the command. The desired state is reached.
+                if (IsRunning()) throw;
+            }
         }
         internal static string StartArguments(Settings settings, string pid, string log)
         {
@@ -207,8 +218,10 @@ namespace AnthropicProxyDesktop
             info.WorkingDirectory = DirectoryPath;
             info.UseShellExecute = false;
             info.CreateNoWindow = true;
-            // Do not create redirected pipes: a detached Windows child can inherit
-            // their handles and keep a reader waiting after the launcher exits.
+            // Management commands never spawn a detached child, so their actual
+            // stderr can be captured safely. Keep daemon startup free of pipes.
+            info.RedirectStandardError = settings == null;
+            string previousLog = settings == null ? "" : ReadLog();
             if (settings != null)
             {
                 string[] variables = { "UPSTREAM_BASE_URL", "ANTHROPIC_PROXY_BASE_URL", "UPSTREAM_API_KEY", "OPENROUTER_API_KEY",
@@ -241,12 +254,20 @@ namespace AnthropicProxyDesktop
             }
             using (Process process = Process.Start(info))
             {
+                Task<string> diagnostic = settings == null ? process.StandardError.ReadToEndAsync() : null;
                 if (!process.WaitForExit(20000)) { process.Kill(); throw new Exception("The proxy command timed out. Check Logs and the current status."); }
                 if (process.ExitCode != 0)
                 {
-                    string details = ReadLog();
-                    if (details.Length > 3000) details = details.Substring(details.Length - 3000);
-                    throw new Exception("Proxy command failed (exit code " + process.ExitCode + ").\r\n" + details);
+                    string details = diagnostic != null && diagnostic.Wait(1000) ? diagnostic.Result : "";
+                    if (settings != null) {
+                        string currentLog = ReadLog();
+                        // Historical request failures are not startup diagnostics.
+                        details = currentLog.StartsWith(previousLog, StringComparison.Ordinal) ? currentLog.Substring(previousLog.Length) :
+                            currentLog == previousLog ? "" : currentLog;
+                    }
+                    if (String.IsNullOrWhiteSpace(details)) details = "No new diagnostic output was recorded. Open Logs to inspect proxy activity.";
+                    string action = settings != null ? "start" : arguments.StartsWith("stop ", StringComparison.Ordinal) ? "stop" : "run the command for";
+                    throw new ProxyCommandException("Could not " + action + " the proxy (exit code " + process.ExitCode + ").", details);
                 }
                 return "";
             }
@@ -737,7 +758,19 @@ namespace AnthropicProxyDesktop
             finally { polling = false; }
         }
         void TryAction(Action action) { try { action(); } catch (Exception error) { ShowError(error); } }
-        void ShowError(Exception error) { warningMessage = error.Message; SetIndicator(State.Warning, "Warning • " + error.Message); feedback.Text = error.Message.Length > 220 ? error.Message.Substring(0, 217) + "..." : error.Message; MessageBox.Show(this, error.Message, "Anthropic-Proxy-RS-Win", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        void ShowError(Exception error)
+        {
+            warningMessage = ErrorDialog.Summary(error);
+            SetIndicator(State.Warning, "Warning • " + warningMessage); feedback.Text = warningMessage;
+            using (var dialog = new ErrorDialog(error)) {
+                bool contrast = SystemInformation.HighContrast;
+                bool dark = !contrast && (ThemeOverride ?? SystemDark());
+                ThemeControl(dialog, contrast ? SystemColors.Window : dark ? Color.FromArgb(30, 30, 30) : Color.FromArgb(246, 246, 246),
+                    contrast ? SystemColors.WindowText : dark ? Color.FromArgb(238, 238, 238) : Color.FromArgb(30, 30, 30),
+                    contrast ? SystemColors.Window : dark ? Color.FromArgb(43, 43, 43) : Color.White, dark, contrast);
+                dialog.ShowDialog(this);
+            }
+        }
         internal void RefreshLogs()
         {
             try

@@ -145,6 +145,25 @@ namespace AnthropicProxyDesktop
             try
             {
                 Require(controller.Help().Contains("--daemon"), "Upstream CLI help is not available");
+                File.WriteAllText(controller.LogPath, "Historical upstream returned 403 Forbidden\r\n");
+                try {
+                    controller.Execute("status --pid-file " + Controller.Quote(Path.Combine(directory, "missing.pid")), null);
+                    throw new Exception("Expected management command failure");
+                } catch (ProxyCommandException error) {
+                    Require(error.Details.Contains("Cannot read PID file"), "Management command stderr was lost");
+                    Require(!error.Details.Contains("403 Forbidden"), "Historical request logs were used as command diagnostics");
+                }
+                var largeError = new ProxyCommandException("Could not stop the proxy (exit code 1).", String.Join("\r\n", Enumerable.Repeat("Diagnostic detail", 2000)));
+                using (var dialog = new ErrorDialog(largeError)) {
+                    dialog.Show(); Application.DoEvents();
+                    Require(dialog.Height < Screen.PrimaryScreen.WorkingArea.Height, "Error dialog exceeds the screen");
+                    Require(dialog.Details.Multiline && dialog.Details.ReadOnly && dialog.Details.ScrollBars == ScrollBars.Both, "Error details do not scroll");
+                    Require(ErrorDialog.Summary(largeError).Length <= 200, "Error summary is unbounded");
+                    using (var image = new Bitmap(dialog.Width, dialog.Height)) {
+                        dialog.DrawToBitmap(image, new Rectangle(0, 0, dialog.Width, dialog.Height)); image.Save(Path.Combine(output, "command-error.png"));
+                    }
+                    dialog.Close();
+                }
                 controller.Save(settings);
                 Require(!File.ReadAllText(controller.SettingsPath).Contains("desktop-secret-key"), "Key was saved in plaintext");
                 Require(controller.Load().GetKey() == "desktop-secret-key", "Saved key did not decrypt");
@@ -170,6 +189,23 @@ namespace AnthropicProxyDesktop
                 controller.SetAutostart(true); controller.AutoStart(); controller.SetAutostart(false);
                 Require(controller.IsRunning(), "Enabled autostart did not start proxy");
                 controller.Start(settings); // Repeated start must leave the managed instance running.
+                controller.Stop();
+                File.AppendAllText(controller.LogPath, "Historical upstream returned 403 Forbidden\r\n");
+                var occupied = new TcpListener(IPAddress.Loopback, port);
+                occupied.Start();
+                try {
+                    try { controller.Start(settings); throw new Exception("Expected occupied-port startup failure"); }
+                    catch (ProxyCommandException error) {
+                        Require(!error.Details.Contains("Historical upstream"), "Startup error contains old request warnings");
+                        Require(error.Details.Contains("Error:"), "Startup failure diagnostic is missing");
+                    }
+                } finally { occupied.Stop(); }
+                controller.Start(settings);
+                using (var cancellation = new System.Threading.CancellationTokenSource()) {
+                    var polling = Task.Run(delegate { while (!cancellation.IsCancellationRequested) { controller.IsRunning(); Thread.Sleep(1); } });
+                    try { for (int i = 0; i < 3; i++) { controller.Stop(); controller.Start(settings); } }
+                    finally { cancellation.Cancel(); Require(polling.Wait(5000), "Concurrent status polling did not finish"); }
+                }
                 string health = new WebClient().DownloadString("http://127.0.0.1:" + port + "/health");
                 Require(health == "OK", "Health failed");
                 progress("Starting request and log capture tests");

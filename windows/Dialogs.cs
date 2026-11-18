@@ -5,6 +5,38 @@ using System.Windows.Forms;
 
 namespace AnthropicProxyDesktop
 {
+    sealed class ProxyCommandException : Exception
+    {
+        internal readonly string Details;
+        internal ProxyCommandException(string message, string details) : base(message) { Details = details; }
+    }
+    sealed class ErrorDialog : Form
+    {
+        internal readonly TextBox Details = new TextBox();
+        internal static string Summary(Exception error)
+        {
+            string text = System.Text.RegularExpressions.Regex.Replace(error.Message ?? "The operation failed.", @"\s+", " ").Trim();
+            return text.Length > 200 ? text.Substring(0, 197) + "..." : text;
+        }
+        internal ErrorDialog(Exception error)
+        {
+            Text = "Anthropic-Proxy-RS-Win"; Font = new Font("Segoe UI", 10);
+            ClientSize = new Size(620, 350); MinimumSize = new Size(460, 280);
+            StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false; MinimizeBox = false; MaximizeBox = false;
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 1, RowCount = 3 };
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+            layout.Controls.Add(new Label { Text = Summary(error), Dock = DockStyle.Fill, AutoEllipsis = true }, 0, 0);
+            Details.Multiline = true; Details.ReadOnly = true; Details.ScrollBars = ScrollBars.Both;
+            Details.WordWrap = false; Details.Dock = DockStyle.Fill; Details.AccessibleName = "Error details";
+            var command = error as ProxyCommandException;
+            Details.Text = command != null ? command.Details : error.Message;
+            layout.Controls.Add(Details, 0, 1);
+            var close = new Button { Text = "Close", DialogResult = DialogResult.OK, AutoSize = true, Anchor = AnchorStyles.Right };
+            layout.Controls.Add(close, 0, 2); Controls.Add(layout); AcceptButton = close; CancelButton = close;
+        }
+    }
     sealed class ExportOptions : Form
     {
         internal readonly CheckBox IncludeKey = new CheckBox();
