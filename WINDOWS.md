@@ -6,7 +6,9 @@ This package includes a native Windows Forms settings app and the 64-bit Rust pr
 
 Extract the ZIP to a permanent folder and open `Anthropic-Proxy-RS-Win.exe`. Keep all packaged files together, including `Anthropic-Proxy-RS-Win.exe.config`. The app follows the Windows app light/dark setting, including changes while it is open, and respects Windows high contrast colors.
 
-Enter the upstream URL, API key and any model overrides. Choose **Save and start** to save and start the form's settings. **Start proxy** starts the last applied settings while preserving the current form for editing; the tray's start command does the same. **Save and apply** saves settings and restarts a running proxy; a stopped proxy stays stopped. Use **Stop proxy** to stop it. Background mode leaves the proxy running when the window closes. With background mode disabled, closing its controlling window stops that proxy. The CLI remains available separately; the app manages its own per-user proxy instance.
+Enter the upstream URL, API key and any model overrides. Choose **Apply** to save the form and update a running proxy. A stopped proxy stays stopped until you choose **Start**. The same button changes to **Stop** while the proxy is running. Start uses the last applied settings and preserves the current form for editing; the tray's start command does the same. **Status** refreshes the current process status. The colored status text appears beneath these three buttons: green for running, red for stopped and orange for warnings.
+
+Background mode leaves the proxy running when the window closes. With background mode disabled, closing its controlling window stops that proxy. The CLI remains available separately; the app manages its own per-user proxy instance.
 
 Command failures show a short summary and scrollable diagnostic details. Startup failures use new output from that attempt, and management commands show their own error output. Earlier upstream HTTP errors remain in Logs. For an upstream 401 or 403, check the provider's required HTTPS endpoint, API key and model access; such a response does not by itself explain a local startup failure.
 
@@ -16,14 +18,14 @@ Settings are saved under `%LOCALAPPDATA%\AnthropicProxy`. The API key is encrypt
 
 ### Save and import named settings
 
-Use the **Saved settings** dropdown above the form:
+Use the **Saved setting profiles** dropdown above the form:
 
 - Type a new name and choose **Save** to create a profile. Saving an existing name updates that profile. Names are case insensitive.
 - Select a saved name and choose **Load** to fill the form. The app asks before replacing unsaved form edits.
 - Select a saved name and choose **Rename** to give it a new name. This preserves its settings and encrypted API key.
 - Choose **Import...** to import a `.env` configuration or an existing desktop `settings.json`. The imported settings appear as a new named profile. Existing names are preserved; repeated imports receive a numeric suffix.
 
-Loading, importing, renaming or saving a profile does not restart the proxy. **Save and apply** or **Save and start** saves the current profile and applies it. Autostart continues to use the last applied settings, even when another profile has been loaded for editing. The autostart checkbox is a shared Windows setting, independent of profiles.
+Loading, importing, renaming or saving a profile does not restart the proxy. **Apply** saves the current profile and applies it. Autostart continues to use the last applied settings, even when another profile has been loaded for editing. The autostart checkbox is a shared Windows setting, independent of profiles.
 
 Profiles are saved in `%LOCALAPPDATA%\AnthropicProxy\profiles.json`. On first use, the app preserves the existing desktop configuration as **Default**. The last loaded or saved profile is selected when the window opens. API keys remain encrypted for the current Windows account. An encrypted JSON key from another account or computer may not decrypt; use a `.env` file or re-enter that key instead.
 
@@ -68,7 +70,7 @@ Uninstall stops the managed proxy and disables its autostart entry. It preserves
 
 ### Autostart
 
-Check **Start proxy when I sign in to Windows**, then **Save and apply**. Uncheck and save to disable it. This controls the current user's `AnthropicProxy` entry in the Windows `Run` registry key; administrator rights are not required. It starts the proxy quietly after sign-in, without opening the settings window. It does not run before sign-in as a Windows service. Windows may delay startup, and Windows Startup settings can separately disable an entry.
+Check **Start proxy when I sign in to Windows**, then **Apply**. Uncheck and save to disable it. This controls the current user's `AnthropicProxy` entry in the Windows `Run` registry key; administrator rights are not required. It starts the proxy quietly after sign-in, without opening the settings window. It does not run before sign-in as a Windows service. Windows may delay startup, and Windows Startup settings can separately disable an entry.
 
 Keep the extracted folder in place while autostart is enabled. After moving the app, open it at the new location and save with autostart enabled to update the registered path. Disable autostart before deleting the package.
 

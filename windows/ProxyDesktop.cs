@@ -356,7 +356,7 @@ namespace AnthropicProxyDesktop
             completion = new TextBox(), reasoning = new TextBox(), mapping = new TextBox(), ignore = new TextBox();
         readonly NumericUpDown port = new NumericUpDown();
         readonly CheckBox passthrough = new CheckBox(), capture = new CheckBox(), autostart = new CheckBox(), showKey = new CheckBox();
-        readonly Button apply = new Button(), start = new Button(), startSaved = new Button(), stop = new Button();
+        readonly Button apply = new Button(), toggle = new Button(), statusButton = new Button();
         readonly ComboBox profileNames = new ComboBox();
         readonly Button saveProfile = new Button(), loadProfile = new Button(), renameProfile = new Button(), importProfile = new Button(), exportProfile = new Button();
         readonly CheckBox debug = new CheckBox(), background = new CheckBox(), noEnvFile = new CheckBox();
@@ -409,8 +409,7 @@ namespace AnthropicProxyDesktop
             ClientSize = new Size(800, Math.Min(810, Math.Max(620, area.Height - 80)));
             MinimumSize = new Size(700, 660);
             StartPosition = FormStartPosition.CenterScreen;
-            var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20), ColumnCount = 1, RowCount = 6 };
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20), ColumnCount = 1, RowCount = 5 };
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -418,15 +417,14 @@ namespace AnthropicProxyDesktop
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             var title = new Label { Text = "Anthropic-Proxy-RS-Win", AutoSize = true, Font = new Font("Segoe UI", 20, FontStyle.Bold), Margin = new Padding(0, 0, 0, 8) };
             root.Controls.Add(title, 0, 0);
-            status.AutoSize = true; status.MaximumSize = new Size(750, 0); status.Margin = new Padding(0, 0, 0, 16); status.Text = "Checking proxy status...";
-            root.Controls.Add(status, 0, 1);
+            status.AutoSize = true; status.MaximumSize = new Size(750, 0); status.Margin = new Padding(0, 8, 0, 4); status.Text = "Checking proxy status...";
             var profileBar = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 7, RowCount = 2, Margin = new Padding(0, 0, 0, 12) };
             profileBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             profileBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             for (int i = 0; i < 5; i++) profileBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            profileBar.Controls.Add(new Label { Text = "Saved settings", AutoSize = true, Margin = new Padding(0, 7, 10, 0) }, 0, 0);
+            profileBar.Controls.Add(new Label { Text = "Saved setting profiles", AutoSize = true, Margin = new Padding(0, 7, 10, 0) }, 0, 0);
             profileNames.Dock = DockStyle.Fill; profileNames.DropDownStyle = ComboBoxStyle.DropDown;
-            profileNames.AccessibleName = "Saved settings profile"; profileNames.MaxLength = 80;
+            profileNames.AccessibleName = "Saved setting profiles"; profileNames.MaxLength = 80;
             profileNames.AutoCompleteMode = AutoCompleteMode.SuggestAppend; profileNames.AutoCompleteSource = AutoCompleteSource.ListItems;
             profileBar.Controls.Add(profileNames, 1, 0);
             saveProfile.Text = "Save"; loadProfile.Text = "Load"; renameProfile.Text = "Rename"; importProfile.Text = "Import..."; exportProfile.Text = "Export...";
@@ -457,7 +455,7 @@ namespace AnthropicProxyDesktop
             }); };
             var profileHint = new Label { Text = "Type a name to save a new profile. Load fills the form; apply it when ready.", AutoSize = true, Margin = new Padding(0, 5, 0, 0) };
             profileBar.Controls.Add(profileHint, 0, 1); profileBar.SetColumnSpan(profileHint, 7);
-            root.Controls.Add(profileBar, 0, 2);
+            root.Controls.Add(profileBar, 0, 1);
             tabs.Dock = DockStyle.Fill;
             var settingsTab = new Panel { Padding = new Padding(10), AutoScroll = true, AccessibleName = "Settings" };
             var logTab = new Panel { Padding = new Padding(10), AccessibleName = "Logs" };
@@ -504,7 +502,7 @@ namespace AnthropicProxyDesktop
                 ApplyDialogTheme(dialog); dialog.ShowDialog(this);
             } }); };
             AddField(fields, "Help and version", help);
-            AddField(fields, "", new Label { Text = "Includes prompts, responses and streamed content. Saved locally.\nOff by default. Save and apply restarts a running proxy.", AutoSize = true, MaximumSize = new Size(450, 0) });
+            AddField(fields, "", new Label { Text = "Includes prompts, responses and streamed content. Saved locally.\nOff by default. Apply restarts a running proxy.", AutoSize = true, MaximumSize = new Size(450, 0) });
             settingsTab.Controls.Add(fields);
 
             var logLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
@@ -519,21 +517,21 @@ namespace AnthropicProxyDesktop
             open.Click += delegate { TryAction(delegate { Process.Start(new ProcessStartInfo("explorer.exe", Controller.Quote(controller.DirectoryPath)) { UseShellExecute = true }); }); };
             logButtons.Controls.Add(clear); logButtons.Controls.Add(open);
             logLayout.Controls.Add(logButtons, 0, 2); logTab.Controls.Add(logLayout);
-            root.Controls.Add(tabs, 0, 3);
+            root.Controls.Add(tabs, 0, 2);
             feedback.AutoSize = true; feedback.MaximumSize = new Size(700, 0); feedback.Margin = new Padding(0, 10, 0, 6);
             feedback.Text = "API keys are encrypted for your Windows account. Apply settings to change the running proxy.";
-            root.Controls.Add(feedback, 0, 4);
+            root.Controls.Add(feedback, 0, 3);
             var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, Margin = new Padding(0, 8, 0, 0) };
-            apply.Text = "Save and apply"; start.Text = "Save and start"; startSaved.Text = "Start proxy"; stop.Text = "Stop proxy";
-            foreach (Button button in new[] { apply, start, startSaved, stop }) { button.AutoSize = true; button.Padding = new Padding(8, 5, 8, 5); actions.Controls.Add(button); }
-            apply.Click += async delegate { await ApplyAsync(false); };
-            start.Click += async delegate { await ApplyAsync(true); };
-            startSaved.Click += async delegate { await StartSavedAsync(); };
-            stop.Click += async delegate { await StopAsync(); };
+            apply.Text = "Apply"; toggle.Text = "Start"; statusButton.Text = "Status";
+            foreach (Button button in new[] { apply, toggle, statusButton }) { button.AutoSize = true; button.Padding = new Padding(8, 5, 8, 5); actions.Controls.Add(button); }
+            apply.Click += async delegate { await ApplyAsync(); };
+            toggle.Click += async delegate { await ToggleAsync(); };
+            statusButton.Click += async delegate { await RefreshStatusAsync(); RefreshLogs(); };
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2 };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             footer.Controls.Add(actions, 0, 0);
             footer.SetColumnSpan(actions, 2);
+            footer.Controls.Add(status, 0, 1); footer.SetColumnSpan(status, 2);
             var about = new TableLayoutPanel { Size = new Size(300, 60), Anchor = AnchorStyles.Right | AnchorStyles.Bottom, ColumnCount = 1, RowCount = 3 };
             about.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             for (int i = 0; i < 3; i++) about.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -544,8 +542,8 @@ namespace AnthropicProxyDesktop
             fork.LinkClicked += delegate { OpenLink("https://github.com/m0n0x41d/anthropic-proxy-rs"); };
             about.Controls.Add(github); about.Controls.Add(fork);
             foreach (Label label in about.Controls) { label.Dock = DockStyle.Fill; label.TextAlign = ContentAlignment.MiddleRight; }
-            footer.Controls.Add(about, 1, 1);
-            root.Controls.Add(footer, 0, 5); Controls.Add(root);
+            footer.Controls.Add(about, 1, 2);
+            root.Controls.Add(footer, 0, 4); Controls.Add(root);
             AcceptButton = apply;
             LoadSettings();
             timer.Interval = 1000;
@@ -572,6 +570,8 @@ namespace AnthropicProxyDesktop
             trayState.ForeColor = status.ForeColor;
         }
         internal Color StatusColor { get { return status.ForeColor; } }
+        internal Button StartStopButton { get { return toggle; } }
+        internal Label StatusLabel { get { return status; } }
         internal void ApplyDialogTheme(Form dialog)
         {
             ThemeControl(dialog, BackColor, ForeColor, apiKey.BackColor, lastDark == true, SystemInformation.HighContrast);
@@ -661,7 +661,7 @@ namespace AnthropicProxyDesktop
             if (confirm && !ConfirmLoad()) return false;
             string name = profileNames.Text;
             FillSettings(controller.Profiles.Load(name)); RefreshProfiles(controller.Profiles.Read().Selected);
-            feedback.Text = "Loaded profile '" + profileNames.Text + "'. Choose Save and apply to use it.";
+            feedback.Text = "Loaded profile '" + profileNames.Text + "'. Choose Apply to use it.";
             return true;
         }
         internal void RenameProfile(string newName)
@@ -673,7 +673,7 @@ namespace AnthropicProxyDesktop
         {
             string name = controller.Profiles.Import(file);
             FillSettings(controller.Profiles.Load(name)); RefreshProfiles(name);
-            feedback.Text = "Imported profile '" + name + "'. Review it, then choose Save and apply to use it.";
+            feedback.Text = "Imported profile '" + name + "'. Review it, then choose Apply to use it.";
         }
         internal ComboBox ProfileDropdown { get { return profileNames; } }
         string PromptProfileName(string current)
@@ -699,7 +699,7 @@ namespace AnthropicProxyDesktop
                 Background = background.Checked, NoEnvFile = noEnvFile.Checked, ConfigFile = configFile.Text.Trim(), PidFile = pidFile.Text.Trim(), LogFile = logFile.Text.Trim() };
             settings.SetKey(apiKey.Text); settings.Validate(); return settings;
         }
-        internal async Task ApplyAsync(bool ensureStarted)
+        internal async Task ApplyAsync()
         {
             if (busy) return;
             SetBusy(true);
@@ -715,10 +715,10 @@ namespace AnthropicProxyDesktop
                     controller.Save(settings); controller.SetAutostart(enable);
                     bool running = controller.IsRunning();
                     if (running) controller.Stop();
-                    if (running || ensureStarted) controller.Start(settings);
+                    if (running) controller.Start(settings);
                 });
                 RefreshProfiles(controller.Profiles.Read().Selected); loadedFingerprint = Fingerprint();
-                feedback.Text = "Settings saved." + (controller.IsRunning() ? " Proxy is running." : " Choose Start proxy when ready.") +
+                feedback.Text = "Settings saved." + (controller.IsRunning() ? " Proxy is running." : " Choose Start when ready.") +
                     (enable ? " Autostart is enabled for your Windows sign-in." : " Autostart is disabled.");
             }
             catch (Exception error) { ShowError(error); }
@@ -729,7 +729,7 @@ namespace AnthropicProxyDesktop
         {
             if (busy) return; SetBusy(true);
             try {
-                if (!File.Exists(controller.SettingsPath)) throw new Exception("Save and apply your settings first, or choose Save and start.");
+                if (!File.Exists(controller.SettingsPath)) throw new Exception("Choose Apply to save your settings before starting.");
                 warningMessage = "";
                 await Task.Run(delegate { controller.Start(controller.Load()); });
                 feedback.Text = "Proxy started with the last applied settings.";
@@ -737,6 +737,12 @@ namespace AnthropicProxyDesktop
             catch (Exception error) { ShowError(error); }
             finally { SetBusy(false); }
             await RefreshStatusAsync(); RefreshLogs();
+        }
+        internal async Task ToggleAsync()
+        {
+            if (busy) return;
+            try { if (controller.IsRunning()) await StopAsync(); else await StartSavedAsync(); }
+            catch (Exception error) { ShowError(error); }
         }
         async Task StopAsync()
         {
@@ -749,7 +755,7 @@ namespace AnthropicProxyDesktop
         void SetBusy(bool value)
         {
             busy = value;
-            foreach (Control control in new Control[] { apply, start, startSaved, stop, profileNames, saveProfile, loadProfile, renameProfile, importProfile, exportProfile }) control.Enabled = !value;
+            foreach (Control control in new Control[] { apply, toggle, statusButton, profileNames, saveProfile, loadProfile, renameProfile, importProfile, exportProfile }) control.Enabled = !value;
         }
         internal async Task RefreshStatusAsync()
         {
@@ -767,8 +773,8 @@ namespace AnthropicProxyDesktop
                 bool warning = !String.IsNullOrEmpty(warningMessage) || (running && state.Warning);
                 SetIndicator(warning ? State.Warning : running ? State.Running : State.Stopped,
                     warning ? (running ? "Running with warning • " : "Warning • ") + (warningMessage.Length > 0 ? warningMessage : "Open Logs for details.") :
-                    running ? "Running • Settings changes apply after saving." : "Stopped • Choose Start proxy, or Save and start to apply this form first.");
-                stop.Enabled = running; start.Enabled = !running; startSaved.Enabled = !running; trayStop.Enabled = running; trayStart.Enabled = !running;
+                    running ? "Running • Choose Apply to use changes to this form." : "Stopped • Choose Start when ready.");
+                toggle.Text = running ? "Stop" : "Start"; trayStop.Enabled = running; trayStart.Enabled = !running;
             }
             catch (Exception error) { if (!IsDisposed) SetIndicator(State.Warning, "Status unavailable: " + error.Message); }
             finally { polling = false; }
