@@ -108,12 +108,6 @@ namespace AnthropicProxyDesktop
             }
             store.Load("Default");
         }
-        static void Pump(Task task, string operation = "UI operation")
-        {
-            var deadline = DateTime.UtcNow.AddSeconds(30);
-            do { Application.DoEvents(); Thread.Sleep(10); } while (!task.IsCompleted && DateTime.UtcNow < deadline);
-            Require(task.IsCompleted, operation + " timed out (task: " + task.Status + ")"); task.GetAwaiter().GetResult(); Application.DoEvents();
-        }
         static void TestExport(Controller controller, string directory)
         {
             Settings settings = controller.Load(); string file = Path.Combine(directory, "export.json");
@@ -242,75 +236,81 @@ namespace AnthropicProxyDesktop
                 progress("Starting native window and theme rendering tests");
                 using (var window = new MainWindow(controller, true))
                 {
-                    window.Show(); Application.DoEvents();
-                    Require(window.TrayVisible, "System tray icon is missing");
-                    Require(window.ReadSettings().GetKey() == "desktop-secret-key", "API key did not load into settings UI");
-                    Require(window.ReadSettings().Port == port, "Port did not load into settings UI");
-                    progress("Testing Apply while stopped");
-                    controller.Stop(); Pump(window.ApplyAsync(), "Apply while stopped");
-                    Require(!controller.IsRunning(), "Apply unexpectedly started a stopped proxy");
-                    Require(window.StartStopButton.Parent.Controls.OfType<Button>().Select(button => button.Text).SequenceEqual(new[] { "Apply", "Start", "Status" }), "Bottom action buttons do not match the requested layout");
-                    Require(window.StatusLabel.PointToScreen(Point.Empty).Y >= window.StartStopButton.PointToScreen(Point.Empty).Y + window.StartStopButton.Height, "Colored status is not below the buttons");
-                    string appliedSettings = File.ReadAllText(controller.SettingsPath);
-                    window.ProfileDropdown.Text = "Unsaved startup draft";
-                    progress("Testing Start with a form draft");
-                    Pump(window.ToggleAsync(), "Start with a form draft");
-                    Require(controller.IsRunning(), "Standalone Start proxy did not start saved settings");
-                    Require(window.StartStopButton.Text == "Stop", "Start button did not change to Stop");
-                    Require(File.ReadAllText(controller.SettingsPath) == appliedSettings, "Standalone Start proxy changed the saved settings");
-                    Require(window.ProfileDropdown.Text == "Unsaved startup draft", "Standalone Start proxy replaced the form draft");
-                    progress("Testing Stop toggle");
-                    Pump(window.ToggleAsync(), "Stop toggle");
-                    Require(!controller.IsRunning() && window.StartStopButton.Text == "Start", "Stop button did not stop the proxy and change to Start");
-                    progress("Testing Start toggle after Stop");
-                    Pump(window.ToggleAsync(), "Start toggle after Stop");
-                    window.ProfileDropdown.Text = "Default";
-                    Require(window.ProfileDropdown.Items.Contains("Default"), "Default profile is missing from dropdown");
-                    window.ProfileDropdown.Text = "Work laptop"; window.SaveProfile();
-                    Require(window.ProfileDropdown.Items.Contains("Work laptop"), "Saving a profile did not update dropdown");
-                    window.RenameProfile("Work setup");
-                    Require(window.ProfileDropdown.Items.Contains("Work setup") && !window.ProfileDropdown.Items.Contains("Work laptop"), "Renaming did not update dropdown");
-                    window.ProfileDropdown.Text = "Imported configuration"; window.LoadProfile(false);
-                    Require(window.ReadSettings().GetKey() == "import-secret#$literal", "Loading from dropdown did not restore imported key");
-                    Require(window.ReadSettings().Port == 3111, "Loading from dropdown did not restore imported port");
-                    Require(controller.Load().Port == port && controller.IsRunning(), "Loading a profile changed the active proxy settings");
-                    window.ImportProfile(Path.Combine(directory, "environment.env"));
-                    Require(window.ProfileDropdown.Text.StartsWith("environment"), "Import did not select new dropdown profile");
-                    window.ProfileDropdown.Text = "Work setup"; window.LoadProfile(false);
-                    Require(window.ReadSettings().GetKey() == "desktop-secret-key", "Switching profiles lost the encrypted key");
-                    Pump(window.RefreshStatusAsync());
-                    window.CapturePreview(Path.Combine(output, "settings-light.png"), false, false);
-                    Require(window.StatusColor == Color.ForestGreen, "Running state is not green in light mode");
-                    Require(window.BackColor.GetBrightness() > 0.5f, "Light theme did not apply");
-                    window.CapturePreview(Path.Combine(output, "settings-dark.png"), true, false);
-                    Require(window.BackColor.GetBrightness() < 0.5f, "Dark theme did not apply");
-                    window.CapturePreview(Path.Combine(output, "logs-dark.png"), true, true);
-                    using (var options = new ExportOptions()) {
-                        window.ApplyDialogTheme(options); options.Show(window); Application.DoEvents();
-                        Require(!options.IncludeKey.Checked && !options.Warning.Visible, "Export key checkbox must default to off");
-                        options.IncludeKey.Checked = true; Application.DoEvents();
-                        Require(options.Warning.Visible && options.Warning.Text == "don't share with others", "Missing key-sharing warning");
-                        using (var image = new Bitmap(options.Width, options.Height)) { options.DrawToBitmap(image, new Rectangle(0, 0, options.Width, options.Height)); image.Save(Path.Combine(output, "export-warning.png")); }
-                        options.Close();
-                    }
-                    using (var file = new FileStream(controller.LogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
-                    using (var writer = new StreamWriter(file)) writer.Write("\r\n2026-11-16T00:00:00Z  WARN anthropic_proxy: Test warning generated by desktop tests\r\n");
-                    Pump(window.RefreshStatusAsync());
-                    Require(window.StatusColor == Color.Orange, "Warning state is not orange in dark mode");
-                    window.CapturePreview(Path.Combine(output, "warning-dark.png"), true, false);
-                    controller.Stop(); Pump(window.RefreshStatusAsync());
-                    Require(window.StatusColor == Color.Salmon, "Stopped state is not red in dark mode");
-                    controller.Start(settings); controller.ClearLogs();
-                    window.ThemeOverride = null; window.ApplyTheme();
-                    Require((window.BackColor.GetBrightness() < 0.5f) == MainWindow.SystemDark(), "System theme selection failed");
-                    window.MaximumSize = new Size(1920, 1080);
-                    window.MinimumSize = new Size(1366, 768);
-                    window.Size = new Size(1366, 768);
-                    Require(window.Width >= 1366 && window.Height >= 768, "Store screenshots are below the required dimensions");
-                    window.CapturePreview(Path.Combine(output, "store-settings-light.png"), false, false);
-                    window.CapturePreview(Path.Combine(output, "store-settings-dark.png"), true, false);
-                    window.CapturePreview(Path.Combine(output, "store-logs-dark.png"), true, true);
-                    window.Close(); Application.DoEvents();
+                    Exception windowError = null;
+                    window.Shown += async delegate {
+                        try {
+                            Require(window.TrayVisible, "System tray icon is missing");
+                            Require(window.ReadSettings().GetKey() == "desktop-secret-key", "API key did not load into settings UI");
+                            Require(window.ReadSettings().Port == port, "Port did not load into settings UI");
+                            progress("Testing Apply while stopped");
+                            controller.Stop(); await window.ApplyAsync();
+                            Require(!controller.IsRunning(), "Apply unexpectedly started a stopped proxy");
+                            Require(window.StartStopButton.Parent.Controls.OfType<Button>().Select(button => button.Text).SequenceEqual(new[] { "Apply", "Start", "Status" }), "Bottom action buttons do not match the requested layout");
+                            Require(window.StatusLabel.PointToScreen(Point.Empty).Y >= window.StartStopButton.PointToScreen(Point.Empty).Y + window.StartStopButton.Height, "Colored status is not below the buttons");
+                            string appliedSettings = File.ReadAllText(controller.SettingsPath);
+                            window.ProfileDropdown.Text = "Unsaved startup draft";
+                            progress("Testing Start with a form draft");
+                            await window.ToggleAsync();
+                            Require(controller.IsRunning(), "Standalone Start proxy did not start saved settings");
+                            Require(window.StartStopButton.Text == "Stop", "Start button did not change to Stop");
+                            Require(File.ReadAllText(controller.SettingsPath) == appliedSettings, "Standalone Start proxy changed the saved settings");
+                            Require(window.ProfileDropdown.Text == "Unsaved startup draft", "Standalone Start proxy replaced the form draft");
+                            progress("Testing Stop toggle");
+                            await window.ToggleAsync();
+                            Require(!controller.IsRunning() && window.StartStopButton.Text == "Start", "Stop button did not stop the proxy and change to Start");
+                            progress("Testing Start toggle after Stop");
+                            await window.ToggleAsync();
+                            window.ProfileDropdown.Text = "Default";
+                            Require(window.ProfileDropdown.Items.Contains("Default"), "Default profile is missing from dropdown");
+                            window.ProfileDropdown.Text = "Work laptop"; window.SaveProfile();
+                            Require(window.ProfileDropdown.Items.Contains("Work laptop"), "Saving a profile did not update dropdown");
+                            window.RenameProfile("Work setup");
+                            Require(window.ProfileDropdown.Items.Contains("Work setup") && !window.ProfileDropdown.Items.Contains("Work laptop"), "Renaming did not update dropdown");
+                            window.ProfileDropdown.Text = "Imported configuration"; window.LoadProfile(false);
+                            Require(window.ReadSettings().GetKey() == "import-secret#$literal", "Loading from dropdown did not restore imported key");
+                            Require(window.ReadSettings().Port == 3111, "Loading from dropdown did not restore imported port");
+                            Require(controller.Load().Port == port && controller.IsRunning(), "Loading a profile changed the active proxy settings");
+                            window.ImportProfile(Path.Combine(directory, "environment.env"));
+                            Require(window.ProfileDropdown.Text.StartsWith("environment"), "Import did not select new dropdown profile");
+                            window.ProfileDropdown.Text = "Work setup"; window.LoadProfile(false);
+                            Require(window.ReadSettings().GetKey() == "desktop-secret-key", "Switching profiles lost the encrypted key");
+                            await window.RefreshStatusAsync();
+                            window.CapturePreview(Path.Combine(output, "settings-light.png"), false, false);
+                            Require(window.StatusColor == Color.ForestGreen, "Running state is not green in light mode");
+                            Require(window.BackColor.GetBrightness() > 0.5f, "Light theme did not apply");
+                            window.CapturePreview(Path.Combine(output, "settings-dark.png"), true, false);
+                            Require(window.BackColor.GetBrightness() < 0.5f, "Dark theme did not apply");
+                            window.CapturePreview(Path.Combine(output, "logs-dark.png"), true, true);
+                            using (var options = new ExportOptions()) {
+                                window.ApplyDialogTheme(options); options.Show(window); Application.DoEvents();
+                                Require(!options.IncludeKey.Checked && !options.Warning.Visible, "Export key checkbox must default to off");
+                                options.IncludeKey.Checked = true; Application.DoEvents();
+                                Require(options.Warning.Visible && options.Warning.Text == "don't share with others", "Missing key-sharing warning");
+                                using (var image = new Bitmap(options.Width, options.Height)) { options.DrawToBitmap(image, new Rectangle(0, 0, options.Width, options.Height)); image.Save(Path.Combine(output, "export-warning.png")); }
+                                options.Close();
+                            }
+                            using (var file = new FileStream(controller.LogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+                            using (var writer = new StreamWriter(file)) writer.Write("\r\n2026-11-16T00:00:00Z  WARN anthropic_proxy: Test warning generated by desktop tests\r\n");
+                            await window.RefreshStatusAsync();
+                            Require(window.StatusColor == Color.Orange, "Warning state is not orange in dark mode");
+                            window.CapturePreview(Path.Combine(output, "warning-dark.png"), true, false);
+                            controller.Stop(); await window.RefreshStatusAsync();
+                            Require(window.StatusColor == Color.Salmon, "Stopped state is not red in dark mode");
+                            controller.Start(settings); controller.ClearLogs();
+                            window.ThemeOverride = null; window.ApplyTheme();
+                            Require((window.BackColor.GetBrightness() < 0.5f) == MainWindow.SystemDark(), "System theme selection failed");
+                            window.MaximumSize = new Size(1920, 1080);
+                            window.MinimumSize = new Size(1366, 768);
+                            window.Size = new Size(1366, 768);
+                            Require(window.Width >= 1366 && window.Height >= 768, "Store screenshots are below the required dimensions");
+                            window.CapturePreview(Path.Combine(output, "store-settings-light.png"), false, false);
+                            window.CapturePreview(Path.Combine(output, "store-settings-dark.png"), true, false);
+                            window.CapturePreview(Path.Combine(output, "store-logs-dark.png"), true, true);
+                        } catch (Exception error) { windowError = error; }
+                        finally { window.Close(); }
+                    };
+                    Application.Run(window);
+                    if (windowError != null) throw new Exception("Native window tests failed.", windowError);
                 }
                 progress("Starting stop and log clearing tests");
                 Require(controller.IsRunning(), "Closing settings stopped the proxy");
