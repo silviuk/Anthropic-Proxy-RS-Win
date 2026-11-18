@@ -90,6 +90,7 @@ namespace AnthropicProxyDesktop
     {
         internal Action<string> Trace = delegate(string message) {};
         internal readonly string DirectoryPath, SettingsPath, Binary;
+        readonly object runtimeLock = new object();
         string RuntimePath { get { return Path.Combine(DirectoryPath, "runtime-paths.json"); } }
         internal string PidPath { get { return RuntimePaths()[0]; } }
         internal string LogPath { get { return RuntimePaths()[1]; } }
@@ -97,8 +98,29 @@ namespace AnthropicProxyDesktop
         internal bool HasForeground { get { return foreground != null && !foreground.HasExited; } }
         string[] RuntimePaths()
         {
-            return File.Exists(RuntimePath) ? new JavaScriptSerializer().Deserialize<string[]>(File.ReadAllText(RuntimePath)) :
-                new[] { Path.Combine(DirectoryPath, "proxy.pid"), Path.Combine(DirectoryPath, "requests.log") };
+            lock (runtimeLock) {
+                try {
+                    using (var file = new FileStream(RuntimePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    using (var reader = new StreamReader(file)) {
+                        var paths = new JavaScriptSerializer().Deserialize<string[]>(reader.ReadToEnd());
+                        if (paths == null || paths.Length != 2) throw new Exception("The saved runtime paths are invalid.");
+                        return paths;
+                    }
+                } catch (FileNotFoundException) {
+                    return new[] { Path.Combine(DirectoryPath, "proxy.pid"), Path.Combine(DirectoryPath, "requests.log") };
+                }
+            }
+        }
+        void SaveRuntimePaths(string pid, string log)
+        {
+            lock (runtimeLock) {
+                string temporary = RuntimePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                try {
+                    File.WriteAllText(temporary, new JavaScriptSerializer().Serialize(new[] { pid, log }));
+                    if (File.Exists(RuntimePath)) File.Replace(temporary, RuntimePath, null);
+                    else File.Move(temporary, RuntimePath);
+                } finally { if (File.Exists(temporary)) File.Delete(temporary); }
+            }
         }
         internal readonly string RunKey;
         internal readonly ProfileStore Profiles;
@@ -190,7 +212,7 @@ namespace AnthropicProxyDesktop
             if (IsRunning()) return;
             string pid = String.IsNullOrWhiteSpace(settings.PidFile) ? Path.Combine(DirectoryPath, "proxy.pid") : settings.PidFile;
             string log = String.IsNullOrWhiteSpace(settings.LogFile) ? Path.Combine(DirectoryPath, "requests.log") : settings.LogFile;
-            File.WriteAllText(RuntimePath, new JavaScriptSerializer().Serialize(new[] { pid, log }));
+            SaveRuntimePaths(pid, log);
             Execute(StartArguments(settings, pid, log), settings);
             Trace("Start: launcher returned; checking PID");
             if (!IsRunning()) throw new Exception("The proxy did not start. Open Logs for details.");
@@ -763,7 +785,9 @@ namespace AnthropicProxyDesktop
         void SetBusy(bool value)
         {
             busy = value;
-            foreach (Control control in new Control[] { apply, toggle, statusButton, profileNames, saveProfile, loadProfile, renameProfile, importProfile, exportProfile }) control.Enabled = !value;
+            // The editable profile name stays available like the other form fields.
+            // Disabling a WinForms autocomplete ComboBox can reset its typed text.
+            foreach (Control control in new Control[] { apply, toggle, statusButton, saveProfile, loadProfile, renameProfile, importProfile, exportProfile }) control.Enabled = !value;
         }
         internal async Task RefreshStatusAsync()
         {
