@@ -88,6 +88,7 @@ namespace AnthropicProxyDesktop
 
     sealed class Controller
     {
+        internal Action<string> Trace = delegate(string message) {};
         internal readonly string DirectoryPath, SettingsPath, Binary;
         string RuntimePath { get { return Path.Combine(DirectoryPath, "runtime-paths.json"); } }
         internal string PidPath { get { return RuntimePaths()[0]; } }
@@ -184,13 +185,16 @@ namespace AnthropicProxyDesktop
         }
         internal void Start(Settings settings)
         {
+            Trace("Start: validating saved settings");
             settings.Validate();
             if (IsRunning()) return;
             string pid = String.IsNullOrWhiteSpace(settings.PidFile) ? Path.Combine(DirectoryPath, "proxy.pid") : settings.PidFile;
             string log = String.IsNullOrWhiteSpace(settings.LogFile) ? Path.Combine(DirectoryPath, "requests.log") : settings.LogFile;
             File.WriteAllText(RuntimePath, new JavaScriptSerializer().Serialize(new[] { pid, log }));
             Execute(StartArguments(settings, pid, log), settings);
+            Trace("Start: launcher returned; checking PID");
             if (!IsRunning()) throw new Exception("The proxy did not start. Open Logs for details.");
+            Trace("Start: process is running");
         }
         internal void Stop()
         {
@@ -254,8 +258,10 @@ namespace AnthropicProxyDesktop
             }
             using (Process process = Process.Start(info))
             {
+                Trace("Command: process started; waiting for exit");
                 Task<string> diagnostic = settings == null ? process.StandardError.ReadToEndAsync() : null;
                 if (!process.WaitForExit(20000)) { process.Kill(); throw new Exception("The proxy command timed out. Check Logs and the current status."); }
+                Trace("Command: exited with " + process.ExitCode);
                 if (process.ExitCode != 0)
                 {
                     string details = diagnostic != null && diagnostic.Wait(1000) ? diagnostic.Result : "";

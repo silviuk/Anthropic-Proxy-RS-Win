@@ -131,11 +131,13 @@ namespace AnthropicProxyDesktop
         {
             string binary = Path.GetFullPath(args[0]), output = Path.GetFullPath(args[1]);
             Directory.CreateDirectory(output);
-            Action<string> progress = delegate(string text) { File.AppendAllText(Path.Combine(output, "desktop-test-progress.txt"), text + "\r\n"); };
+            object progressLock = new object();
+            Action<string> progress = delegate(string text) { lock (progressLock) File.AppendAllText(Path.Combine(output, "desktop-test-progress.txt"), text + "\r\n"); };
             progress("Starting settings and encryption tests");
             string directory = Path.Combine(Path.GetTempPath(), "Anthropic Proxy UI test " + Guid.NewGuid().ToString("N"));
             string runKey = @"Software\AnthropicProxy\Tests\" + Guid.NewGuid().ToString("N");
             var controller = new Controller(directory, binary, runKey);
+            controller.Trace = progress;
             var reservation = new TcpListener(IPAddress.Loopback, 0);
             reservation.Start(); int port = ((IPEndPoint)reservation.LocalEndpoint).Port; reservation.Stop();
             var upstream = new TcpListener(IPAddress.Loopback, 0);
@@ -331,6 +333,10 @@ namespace AnthropicProxyDesktop
                 Require(new WebClient().DownloadString("http://127.0.0.1:" + port + "/health") == "OK", "Foreground proxy is not serving");
                 controller.Stop(); Require(!controller.IsRunning(), "Foreground stop failed");
                 File.WriteAllText(Path.Combine(output, "desktop-test-result.txt"), "PASS: saved settings, DPAPI key encryption, input validation, autostart enable/disable, quoted paths, native window rendering, light/dark/system themes, proxy start/stop, requests/responses in logs, closing UI keeps proxy running, log clearing and capture setting persistence, profile migration/save/load/rename, dropdown selection, .env and encrypted JSON import, duplicate import names and invalid-import preservation, export without key by default and explicit-key round-trip, export warning, green/red/orange status, debug/verbose CLI flags, config file, foreground mode and custom PID/log files.\r\n");
+            }
+            catch {
+                try { File.WriteAllText(Path.Combine(output, "failure-proxy.log"), controller.ReadLog()); } catch {}
+                throw;
             }
             finally
             {
