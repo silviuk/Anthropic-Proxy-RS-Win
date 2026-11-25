@@ -1,5 +1,8 @@
 // Packaged startup integration for the Windows UI. The original proxy is by
 // Ivan Zakutnii (m0n0x41d); Windows UI and packaging by Silviu Vlasceanu.
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.ApplicationModel.h>
 #include <chrono>
