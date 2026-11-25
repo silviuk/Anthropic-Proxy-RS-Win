@@ -19,10 +19,38 @@ try {
     $package = Get-AppxPackage -Name $identity.Name
     if (-not $package -or $package.PackageFamilyName -ne $identity.PackageFamilyName) { throw 'Installed package identity mismatch.' }
     if ($package.Version -ne "$version.0") { throw 'Installed MSIX version mismatch.' }
-    foreach ($file in @('Anthropic-Proxy-RS-Win.exe','ProxyStartup.exe','StartupControl.exe','anthropic-proxy.exe','Assets/icon-150.png')) {
+    foreach ($file in @('Anthropic-Proxy-RS-Win.exe','ProxyStartup.exe','StartupControl.dll','anthropic-proxy.exe','Assets/icon-150.png')) {
         if (-not (Test-Path (Join-Path $package.InstallLocation $file))) { throw "MSIX is missing $file" }
     }
-    # Launch with actual package identity and verify packaged startup API access.
+    # Launch the installed app through the shell, as the Store and Start menu do.
+    Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class StoreWindow {
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern int GetClassName(IntPtr window, StringBuilder name, int capacity);
+    public static bool IsSettingsWindow(IntPtr window) {
+        var name = new StringBuilder(256);
+        GetClassName(window, name, name.Capacity);
+        return name.ToString().StartsWith("WindowsForms10.Window.", StringComparison.Ordinal);
+    }
+}
+'@
+    Start-Process explorer.exe -ArgumentList "shell:AppsFolder\$($identity.PackageFamilyName)!App"
+    $deadline = (Get-Date).AddSeconds(30)
+    $window = $null
+    do {
+        $window = Get-Process -Name 'Anthropic-Proxy-RS-Win' -ErrorAction SilentlyContinue |
+            Where-Object { $_.MainWindowTitle -eq 'Anthropic-Proxy-RS-Win' -and [StoreWindow]::IsSettingsWindow($_.MainWindowHandle) } |
+            Select-Object -First 1
+        if (-not $window) { Start-Sleep -Milliseconds 200 }
+    } until ($window -or (Get-Date) -ge $deadline)
+    if (-not $window) { throw 'Opening the installed app did not show the settings window.' }
+    Stop-Process -Id $window.Id
+    if (-not $window.WaitForExit(5000)) { throw 'The first-launch test process did not exit.' }
+
+    # Exercise the startup API in the installed package.
     $output = (Resolve-Path dist/ui-test).Path
     Invoke-CommandInDesktopPackage -PackageFamilyName $identity.PackageFamilyName -AppId App -Command (Join-Path $package.InstallLocation 'Anthropic-Proxy-RS-Win.exe') -Args "--package-self-test `"$output`"" -PreventBreakaway
     $deadline = (Get-Date).AddSeconds(30)
@@ -34,7 +62,7 @@ try {
     Get-Content dist/ui-test/msix-runtime-result.txt
     Remove-AppxPackage -Package $package.PackageFullName
     if (Get-AppxPackage -Name $identity.Name) { throw 'MSIX uninstall did not finish.' }
-    'PASS: unsigned Store identity validation, test-signed install, packaged startup API, installed files and removal.' | Set-Content dist/ui-test/msix-install-result.txt
+    'PASS: unsigned Store identity validation, test-signed install, shell first launch, packaged startup API, installed files and removal.' | Set-Content dist/ui-test/msix-install-result.txt
 } finally {
     Get-AppxPackage -Name $identity.Name | Remove-AppxPackage -ErrorAction SilentlyContinue
     Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -ErrorAction SilentlyContinue

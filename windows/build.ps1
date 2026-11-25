@@ -26,20 +26,22 @@ if ($MSIX) {
     if (-not $vs) { throw 'Visual C++ build tools are required for packaged startup control.' }
     $environment = Join-Path $vs 'Common7/Tools/VsDevCmd.bat'
     $source = Join-Path $PSScriptRoot 'StartupControl.cpp'
-    $target = Join-Path $OutputDirectory 'StartupControl.exe'
+    $target = Join-Path $OutputDirectory 'StartupControl.dll'
     $object = Join-Path $OutputDirectory 'StartupControl.obj'
+    $importLibrary = Join-Path $OutputDirectory 'StartupControl.lib'
+    $exports = Join-Path $OutputDirectory 'StartupControl.exp'
     $buildScript = Join-Path $OutputDirectory 'build-startup.cmd'
     [IO.File]::WriteAllLines($buildScript, @(
         '@echo off',
         "call `"$environment`" -no_logo -arch=x64",
         'if errorlevel 1 exit /b %errorlevel%',
-        "cl.exe /nologo /std:c++20 /EHsc /MT /O2 `"$source`" /Fe:`"$target`" /Fo:`"$object`" /link windowsapp.lib",
+        "cl.exe /nologo /std:c++20 /EHsc /MT /O2 /LD `"$source`" /Fe:`"$target`" /Fo:`"$object`" /link /IMPLIB:`"$importLibrary`" windowsapp.lib",
         'exit /b %errorlevel%'
     ))
     try {
         & $env:ComSpec /d /c $buildScript
         if ($LASTEXITCODE -ne 0) { throw 'Packaged startup control compilation failed.' }
     } finally {
-        Remove-Item $object, $buildScript -ErrorAction SilentlyContinue
+        Remove-Item $object, $importLibrary, $exports, $buildScript -ErrorAction SilentlyContinue
     }
 }

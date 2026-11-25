@@ -16,7 +16,7 @@ using Microsoft.Win32;
 
 [assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8", FrameworkDisplayName = ".NET Framework 4.8")]
 [assembly: System.Reflection.AssemblyTitle("Anthropic-Proxy-RS-Win")]
-[assembly: System.Reflection.AssemblyVersion("1.5.4.0")]
+[assembly: System.Reflection.AssemblyVersion("1.5.5.0")]
 
 namespace AnthropicProxyDesktop
 {
@@ -199,11 +199,11 @@ namespace AnthropicProxyDesktop
             catch (InvalidOperationException) { return false; }
             // Permission failures are shown to the user rather than treated as a stopped process.
         }
-        internal void AutoStart()
+        internal bool AutoStart()
         {
-            if (Autostart) {
-                Settings settings = Load(); settings.Background = true; Start(settings);
-            }
+            if (!Autostart) return false;
+            Settings settings = Load(); settings.Background = true; Start(settings);
+            return true;
         }
         internal void Start(Settings settings)
         {
@@ -390,6 +390,9 @@ namespace AnthropicProxyDesktop
         readonly CheckBox debug = new CheckBox(), background = new CheckBox(), noEnvFile = new CheckBox();
         readonly TextBox configFile = new TextBox(), pidFile = new TextBox(), logFile = new TextBox();
         string warningMessage = "";
+        string autostartWarning = "";
+        bool? appliedAutostart;
+        bool loadingAutostart;
         internal enum State { Running, Stopped, Warning }
         State indicator = State.Stopped;
         string loadedFingerprint = "";
@@ -556,7 +559,10 @@ namespace AnthropicProxyDesktop
             foreach (Button button in new[] { apply, toggle, statusButton }) { button.AutoSize = true; button.Padding = new Padding(8, 5, 8, 5); actions.Controls.Add(button); }
             apply.Click += async delegate { await ApplyAsync(); };
             toggle.Click += async delegate { await ToggleAsync(); };
-            statusButton.Click += async delegate { await RefreshStatusAsync(); RefreshLogs(); };
+            statusButton.Click += async delegate {
+                if (!appliedAutostart.HasValue) await LoadAutostartAsync();
+                await RefreshStatusAsync(); RefreshLogs();
+            };
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2 };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             footer.Controls.Add(actions, 0, 0);
@@ -579,7 +585,12 @@ namespace AnthropicProxyDesktop
             timer.Interval = 1000;
             timer.Tick += async delegate { ApplyTheme(); if (tabs.SelectedIndex == 1) RefreshLogs(); await RefreshStatusAsync(); };
             tabs.SelectedIndexChanged += delegate { RefreshLogs(); };
-            Shown += async delegate { ApplyTheme(); timer.Start(); if (startHidden) { Hide(); ShowInTaskbar = false; } await RefreshStatusAsync(); };
+            Shown += async delegate {
+                ApplyTheme(); timer.Start();
+                if (startHidden) { Hide(); ShowInTaskbar = false; }
+                if (PackagedStartup.IsPackaged) await LoadAutostartAsync();
+                await RefreshStatusAsync();
+            };
             Resize += delegate { if (WindowState == FormWindowState.Minimized) { Hide(); ShowInTaskbar = false; } };
             FormClosing += delegate(object sender, FormClosingEventArgs args) {
                 if (!automation && !exitRequested && args.CloseReason == CloseReason.UserClosing && !controller.HasForeground) {
@@ -649,7 +660,28 @@ namespace AnthropicProxyDesktop
             var library = controller.Profiles.Read();
             FillSettings(library.Profiles.First(p => String.Equals(p.Name, library.Selected, StringComparison.OrdinalIgnoreCase)).Settings);
             RefreshProfiles(library.Selected);
-            autostart.Checked = controller.Autostart;
+            if (PackagedStartup.IsPackaged) {
+                autostart.CheckState = CheckState.Indeterminate;
+                autostart.Enabled = false;
+            } else {
+                autostart.Checked = controller.Autostart;
+                appliedAutostart = autostart.Checked;
+            }
+        }
+        async Task LoadAutostartAsync()
+        {
+            if (loadingAutostart) return;
+            loadingAutostart = true;
+            try {
+                bool enabled = await Task.Run(() => controller.Autostart);
+                if (IsDisposed) return;
+                appliedAutostart = enabled;
+                autostart.Checked = enabled;
+                autostart.Enabled = true;
+                autostartWarning = "";
+            } catch (InvalidOperationException error) {
+                if (!IsDisposed) autostartWarning = ErrorDialog.Summary(error);
+            } finally { loadingAutostart = false; }
         }
         void FillSettings(Settings settings)
         {
@@ -736,20 +768,23 @@ namespace AnthropicProxyDesktop
             try
             {
                 Settings settings = ReadSettings();
-                bool enable = autostart.Checked;
-                if (enable && !settings.Background) throw new Exception("Autostart requires background mode. Enable Keep running after closing this window.");
+                bool? requestedAutostart = appliedAutostart.HasValue ? (bool?)autostart.Checked : null;
+                bool changeAutostart = requestedAutostart != appliedAutostart;
+                if (requestedAutostart == true && !settings.Background) throw new Exception("Autostart requires background mode. Enable Keep running after closing this window.");
                 warningMessage = "";
                 string profileName = ProfileStore.Name(profileNames.Text);
                 await Task.Run(delegate {
                     controller.Profiles.Save(profileName, settings);
-                    controller.Save(settings); controller.SetAutostart(enable);
+                    controller.Save(settings);
                     bool running = controller.IsRunning();
                     if (running) controller.Stop();
                     if (running) controller.Start(settings);
+                    if (changeAutostart) controller.SetAutostart(requestedAutostart.Value);
                 });
+                if (changeAutostart) appliedAutostart = requestedAutostart;
                 RefreshProfiles(controller.Profiles.Read().Selected); loadedFingerprint = Fingerprint();
                 feedback.Text = "Settings saved." + (controller.IsRunning() ? " Proxy is running." : " Choose Start when ready.") +
-                    (enable ? " Autostart is enabled for your Windows sign-in." : " Autostart is disabled.");
+                    (changeAutostart ? (requestedAutostart == true ? " Autostart is enabled for your Windows sign-in." : " Autostart is disabled.") : "");
             }
             catch (Exception error) { ShowError(error); }
             finally { SetBusy(false); }
@@ -802,9 +837,10 @@ namespace AnthropicProxyDesktop
                 });
                 bool running = state.Running;
                 if (IsDisposed || busy) return;
-                bool warning = !String.IsNullOrEmpty(warningMessage) || (running && state.Warning);
+                string warningDetails = warningMessage.Length > 0 ? warningMessage : autostartWarning;
+                bool warning = warningDetails.Length > 0 || (running && state.Warning);
                 SetIndicator(warning ? State.Warning : running ? State.Running : State.Stopped,
-                    warning ? (running ? "Running with warning • " : "Warning • ") + (warningMessage.Length > 0 ? warningMessage : "Open Logs for details.") :
+                    warning ? (running ? "Running with warning • " : "Warning • ") + (warningDetails.Length > 0 ? warningDetails : "Open Logs for details.") :
                     running ? "Running • Choose Apply to use changes to this form." : "Stopped • Choose Start when ready.");
                 toggle.Text = running ? "Stop" : "Start"; trayStop.Enabled = running; trayStart.Enabled = !running;
             }
@@ -905,13 +941,21 @@ namespace AnthropicProxyDesktop
             {
                 if (args.Length > 0 && args[0] == "--package-self-test") {
                     if (!PackagedStartup.IsPackaged) throw new Exception("The Store runtime test has no package identity.");
-                    bool enabled = PackagedStartup.Enabled;
+                    bool enabled = Task.Run(() => PackagedStartup.Enabled).GetAwaiter().GetResult();
+                    if (enabled) throw new Exception("Packaged autostart should be disabled on a clean install.");
+                    Task.Run(delegate {
+                        try {
+                            PackagedStartup.SetEnabled(true);
+                            if (!PackagedStartup.Enabled) throw new Exception("Packaged autostart did not enable.");
+                        } finally { PackagedStartup.SetEnabled(false); }
+                        if (PackagedStartup.Enabled) throw new Exception("Packaged autostart did not disable.");
+                    }).GetAwaiter().GetResult();
                     using (var window = new MainWindow(control: new Controller(Path.Combine(args[1], "package-runtime"), Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "anthropic-proxy.exe")), automation: true)) {
                         window.Show(); Application.DoEvents();
                         if (!window.TrayVisible) throw new Exception("Packaged tray icon did not initialize.");
                         window.Close();
                     }
-                    File.WriteAllText(Path.Combine(args[1], "msix-runtime-result.txt"), "PASS: package identity, packaged startup state " + enabled + ", native window and tray initialization.");
+                    File.WriteAllText(Path.Combine(args[1], "msix-runtime-result.txt"), "PASS: package identity, autostart off by default, enable and disable, native window and tray initialization.");
                     return 0;
                 }
                 if (args.Length > 0 && args[0] == "--installer-preview") { DesktopTests.PreviewInstaller(args[1], args[2]); return 0; }
@@ -920,7 +964,7 @@ namespace AnthropicProxyDesktop
                 if (args.Contains("--uninstall")) { controller.Stop(); controller.SetAutostart(false); return 0; }
                 if (args.Contains("--autostart"))
                 {
-                    controller.AutoStart(); if (!controller.Autostart) return 0;
+                    if (!Task.Run(() => controller.AutoStart()).GetAwaiter().GetResult()) return 0;
                 }
                 bool created;
                 using (var mutex = new Mutex(true, @"Local\AnthropicProxySettings", out created))

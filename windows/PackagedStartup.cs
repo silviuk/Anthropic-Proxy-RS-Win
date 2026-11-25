@@ -1,7 +1,5 @@
 using System;
 #if MSIX_BUILD
-using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 #endif
@@ -14,25 +12,39 @@ namespace AnthropicProxyDesktop
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
         static extern int GetCurrentPackageFullName(ref int length, StringBuilder name);
         internal static bool IsPackaged { get { int size = 0; return GetCurrentPackageFullName(ref size, null) == 122; } }
-        static int Command(string command)
+        [DllImport("StartupControl.dll", ExactSpelling = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.ApplicationDirectory | DllImportSearchPath.System32)]
+        static extern int ControlStartup(int operation, out int state);
+
+        enum Operation { Read, Enable, Disable }
+        enum State { Disabled, DisabledByUser, Enabled, DisabledByPolicy, EnabledByPolicy }
+        static State Command(Operation operation)
         {
-            string executable = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StartupControl.exe");
-            var info = new ProcessStartInfo(executable, command) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-            using (var process = Process.Start(info)) {
-                var output = process.StandardOutput.ReadToEndAsync(); var error = process.StandardError.ReadToEndAsync();
-                if (!process.WaitForExit(10000)) { process.Kill(); throw new Exception("Windows startup control timed out."); }
+            try {
                 int state;
-                if (process.ExitCode != 0 || !Int32.TryParse(output.GetAwaiter().GetResult().Trim(), out state))
-                    throw new Exception("Windows startup control failed: " + error.GetAwaiter().GetResult());
-                return state;
+                int result = ControlStartup((int)operation, out state);
+                if (result < 0) {
+                    Exception error = Marshal.GetExceptionForHR(result, new IntPtr(-1));
+                    throw new InvalidOperationException(String.Format("Windows startup control failed (0x{0:X8}): {1}", result, error.Message), error);
+                }
+                return (State)state;
+            } catch (DllNotFoundException error) {
+                throw new InvalidOperationException("Windows startup control could not load its packaged component.", error);
+            } catch (EntryPointNotFoundException error) {
+                throw new InvalidOperationException("Windows startup control could not find its packaged entry point.", error);
+            } catch (BadImageFormatException error) {
+                throw new InvalidOperationException("Windows startup control could not use its packaged component.", error);
             }
         }
-        internal static bool Enabled { get { int state = Command("state"); return state == 2 || state == 4; } }
+        static bool IsEnabled(State state) { return state == State.Enabled || state == State.EnabledByPolicy; }
+        internal static bool Enabled { get { return IsEnabled(Command(Operation.Read)); } }
         internal static void SetEnabled(bool enabled)
         {
-            int state = Command(enabled ? "enable" : "disable");
-            if (enabled && state != 2 && state != 4)
-                throw new Exception(state == 1 ? "Enable Anthropic-Proxy-RS-Win in Windows Settings > Apps > Startup, then save again." : "Windows policy does not allow this startup task to be enabled.");
+            State state = Command(enabled ? Operation.Enable : Operation.Disable);
+            if (enabled != IsEnabled(state))
+                throw new InvalidOperationException(state == State.DisabledByUser
+                    ? "Enable Anthropic-Proxy-RS-Win in Windows Settings > Apps > Startup, then try again."
+                    : "Windows did not allow the requested change to sign-in startup.");
         }
 #else
         internal static bool IsPackaged { get { return false; } }
